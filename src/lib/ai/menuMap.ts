@@ -33,7 +33,7 @@ export function toDashboardMeals(menu: GeneratedMenu): Meal[] {
       time: meal.time,
       imageUrl: image.url,
       imageAlt: image.alt,
-      badge: meal.rationale || undefined,
+      rationale: meal.rationale || undefined,
       items: meal.items.map((item) => ({
         name: item.name,
         quantity: item.quantity,

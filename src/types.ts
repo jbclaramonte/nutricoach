@@ -25,6 +25,8 @@ export interface Meal {
   imageAlt: string
   /** Badge posé sur la photo, par ex. « Suggestion Modifiée ». */
   badge?: string
+  /** Phrase du modèle justifiant le choix du repas, affichée sous le titre. */
+  rationale?: string
   items: FoodItem[]
   eaten: boolean
 }

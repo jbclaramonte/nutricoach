@@ -1,5 +1,49 @@
 import type { ChatMessage } from '../../lib/chat'
+import { parseMarkdown, type InlineNode } from '../../lib/markdown'
 import { Icon } from '../Icon'
+
+function Inline({ nodes }: { nodes: InlineNode[] }) {
+  return (
+    <>
+      {nodes.map((node, index) =>
+        node.type === 'bold' ? (
+          <strong key={index}>{node.value}</strong>
+        ) : node.type === 'italic' ? (
+          <em key={index}>{node.value}</em>
+        ) : node.type === 'code' ? (
+          <code className="rounded bg-surface-container px-xs font-mono" key={index}>
+            {node.value}
+          </code>
+        ) : (
+          <span key={index}>{node.value}</span>
+        ),
+      )}
+    </>
+  )
+}
+
+/** Les réponses du modèle contiennent du markdown ; les messages saisis, non. */
+function Markdown({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col gap-sm">
+      {parseMarkdown(text).map((block, index) =>
+        block.type === 'list' ? (
+          <ul className="flex list-disc flex-col gap-xs pl-md" key={index}>
+            {block.items.map((item, itemIndex) => (
+              <li key={itemIndex}>
+                <Inline nodes={item} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="whitespace-pre-wrap" key={index}>
+            <Inline nodes={block.content} />
+          </p>
+        ),
+      )}
+    </div>
+  )
+}
 
 interface MessageBubbleProps {
   message: ChatMessage
@@ -24,7 +68,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             src={message.attachment.dataUrl}
           />
         )}
-        {message.text && <p className="whitespace-pre-wrap">{message.text}</p>}
+        {message.text &&
+          (isUser ? (
+            <p className="whitespace-pre-wrap">{message.text}</p>
+          ) : (
+            <Markdown text={message.text} />
+          ))}
       </div>
 
       {(message.interrupted || message.failed) && (

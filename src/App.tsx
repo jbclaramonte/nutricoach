@@ -16,6 +16,7 @@ import { isConfigured } from './lib/ai/settings'
 import { DashboardScreen } from './screens/DashboardScreen'
 import { PlaceholderScreen } from './screens/PlaceholderScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
+import { SettingsScreen } from './screens/SettingsScreen'
 
 export default function App() {
   const route = useHashRoute('dashboard')
@@ -23,6 +24,7 @@ export default function App() {
   // Le coach est ouvert par-dessus le dashboard : la barre de chat n'est donc
   // visible que sur ces deux routes.
   const isCoach = route === 'coach'
+  const isSettings = route === 'reglages'
   const showChat = route === 'dashboard' || isCoach
 
   // L'état partagé vit ici : le dashboard et le coach doivent voir le même
@@ -63,16 +65,14 @@ export default function App() {
       <AppHeader
         avatarUrl={dashboardData.user.avatarUrl}
         logoUrl={dashboardData.logoUrl}
-        title={navItem?.label ?? 'NutriAdapt'}
+        title={isSettings ? 'Réglages' : (navItem?.label ?? 'NutriAdapt')}
       />
 
       <main className="min-h-screen bg-background pb-20 pt-16">
-        {route === 'profil' ? (
-          <ProfileScreen
-            aiSettings={aiSettings}
-            modelCatalog={modelCatalog}
-            profileStore={profileStore}
-          />
+        {isSettings ? (
+          <SettingsScreen aiSettings={aiSettings} modelCatalog={modelCatalog} />
+        ) : route === 'profil' ? (
+          <ProfileScreen profileStore={profileStore} />
         ) : route === 'progress' ? (
           <PlaceholderScreen
             description="Le suivi du poids et des tendances de macros arrivera ici."
@@ -116,7 +116,8 @@ export default function App() {
           onSend={handleSend}
         />
       )}
-      <BottomNav activeRoute={navItem?.route ?? 'dashboard'} />
+      {/* Les réglages ne sont pas un onglet : aucun item ne doit s'y allumer. */}
+      <BottomNav activeRoute={isSettings ? '' : (navItem?.route ?? 'dashboard')} />
     </div>
   )
 }

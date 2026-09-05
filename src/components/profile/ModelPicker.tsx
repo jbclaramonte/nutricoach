@@ -18,9 +18,39 @@ function formatPrice(pricePerM: number | null): string {
   return `${pricePerM < 1 ? pricePerM.toFixed(2) : pricePerM.toFixed(1)} $/M`
 }
 
+function Badges({ model, active }: { model: ORModel; active: boolean }) {
+  return (
+    <span className="flex flex-wrap gap-xs">
+      {model.supportsVision && (
+        <span
+          className={`flex items-center gap-xs rounded-full px-sm py-xs font-label-md text-caption ${
+            active ? 'bg-on-primary/20' : 'bg-secondary-container text-on-secondary-container'
+          }`}
+        >
+          <Icon className="text-caption" name="photo_camera" /> Photo
+        </span>
+      )}
+      {model.supportsStructuredOutputs && (
+        <span
+          className={`flex items-center gap-xs rounded-full px-sm py-xs font-label-md text-caption ${
+            active ? 'bg-on-primary/20' : 'bg-surface-container text-on-surface-variant'
+          }`}
+        >
+          <Icon className="text-caption" name="data_object" /> JSON
+        </span>
+      )}
+    </span>
+  )
+}
+
 export function ModelPicker({ models, selectedId, onSelect }: ModelPickerProps) {
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
+  // La liste complète noierait le reste de l'écran : elle ne s'ouvre qu'à la
+  // demande, le résumé du modèle actif suffisant le reste du temps.
+  const [open, setOpen] = useState(false)
+
+  const selected = models.find((model) => model.id === selectedId)
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -34,6 +64,37 @@ export function ModelPicker({ models, selectedId, onSelect }: ModelPickerProps) 
       )
       .sort((a, b) => (a.promptPricePerM ?? Infinity) - (b.promptPricePerM ?? Infinity))
   }, [models, query, showAll])
+
+  if (!open) {
+    return (
+      <div className="flex flex-col gap-xs rounded-lg bg-surface-container-low p-sm">
+        {selected ? (
+          <>
+            <span className="font-label-md text-caption font-semibold text-on-surface">
+              {selected.name}
+            </span>
+            <span className="font-caption text-caption text-on-surface-variant">
+              {formatPrice(selected.promptPricePerM)} entrée ·{' '}
+              {formatPrice(selected.completionPricePerM)} sortie
+            </span>
+            <Badges active={false} model={selected} />
+          </>
+        ) : (
+          <span className="font-caption text-caption text-on-surface-variant">
+            Aucun modèle sélectionné — choisissez celui qui analysera vos repas.
+          </span>
+        )}
+        <button
+          className="mt-xs flex items-center justify-center gap-xs rounded-lg bg-surface-container px-md py-xs font-label-md text-caption text-on-surface-variant"
+          onClick={() => setOpen(true)}
+          type="button"
+        >
+          <Icon className="text-caption" name="swap_horiz" />
+          {selected ? 'Changer de modèle' : 'Choisir un modèle'}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-sm">
@@ -56,6 +117,14 @@ export function ModelPicker({ models, selectedId, onSelect }: ModelPickerProps) 
           <Icon className="text-caption" name={showAll ? 'filter_alt_off' : 'filter_alt'} />
           Tous
         </button>
+        <button
+          aria-label="Fermer la liste des modèles"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container text-on-surface-variant"
+          onClick={() => setOpen(false)}
+          type="button"
+        >
+          <Icon className="text-body-md" name="close" />
+        </button>
       </div>
 
       <p className="font-caption text-caption text-on-surface-variant">
@@ -74,7 +143,10 @@ export function ModelPicker({ models, selectedId, onSelect }: ModelPickerProps) 
                 active ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container-low text-on-surface'
               }`}
               key={model.id}
-              onClick={() => onSelect(model.id)}
+              onClick={() => {
+                onSelect(model.id)
+                setOpen(false)
+              }}
               type="button"
             >
               <span className="flex items-center justify-between gap-xs">
@@ -91,26 +163,7 @@ export function ModelPicker({ models, selectedId, onSelect }: ModelPickerProps) 
                 {formatPrice(model.promptPricePerM)} entrée ·{' '}
                 {formatPrice(model.completionPricePerM)} sortie
               </span>
-              <span className="flex flex-wrap gap-xs">
-                {model.supportsVision && (
-                  <span
-                    className={`flex items-center gap-xs rounded-full px-sm py-xs font-label-md text-caption ${
-                      active ? 'bg-on-primary/20' : 'bg-secondary-container text-on-secondary-container'
-                    }`}
-                  >
-                    <Icon className="text-caption" name="photo_camera" /> Photo
-                  </span>
-                )}
-                {model.supportsStructuredOutputs && (
-                  <span
-                    className={`flex items-center gap-xs rounded-full px-sm py-xs font-label-md text-caption ${
-                      active ? 'bg-on-primary/20' : 'bg-surface-container text-on-surface-variant'
-                    }`}
-                  >
-                    <Icon className="text-caption" name="data_object" /> JSON
-                  </span>
-                )}
-              </span>
+              <Badges active={active} model={model} />
             </button>
           )
         })}

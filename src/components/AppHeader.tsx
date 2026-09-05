@@ -12,7 +12,16 @@ export function AppHeader({ logoUrl, avatarUrl, title }: AppHeaderProps) {
           <img alt="NutriAdapt" className="h-8 w-auto object-contain" src={logoUrl} />
           <span className="font-headline-md text-headline-md text-on-surface">{title}</span>
         </div>
-        <img alt="Profil" className="h-8 w-8 rounded-full object-cover" src={avatarUrl} />
+        <button
+          aria-label="Réglages"
+          className="flex h-11 w-11 items-center justify-center rounded-full"
+          onClick={() => {
+            window.location.hash = '#/reglages'
+          }}
+          type="button"
+        >
+          <img alt="" className="h-8 w-8 rounded-full object-cover" src={avatarUrl} />
+        </button>
       </div>
     </header>
   )

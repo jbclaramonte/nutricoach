@@ -39,6 +39,12 @@ export function MealCard({ meal, onToggleEaten }: MealCardProps) {
               </span>
             </div>
             <h3 className="font-headline-md text-headline-md text-on-surface">{meal.title}</h3>
+            {meal.rationale && (
+              <p className="mt-xs flex items-start gap-xs font-body-md text-caption italic text-on-surface-variant">
+                <Icon className="mt-[2px] text-caption text-primary" name="auto_awesome" />
+                {meal.rationale}
+              </p>
+            )}
           </div>
           <button
             aria-label={meal.eaten ? `Marquer ${meal.slotLabel} comme non pris` : `Marquer ${meal.slotLabel} comme pris`}

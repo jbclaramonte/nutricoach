@@ -1,10 +1,7 @@
 import { Icon } from '../components/Icon'
-import { AiSettingsSection } from '../components/profile/AiSettingsSection'
 import { ChipInput } from '../components/profile/ChipInput'
 import { NumberField } from '../components/profile/NumberField'
 import { SectionCard } from '../components/profile/SectionCard'
-import type { UseAiSettingsResult } from '../hooks/useAiSettings'
-import type { UseModelCatalogResult } from '../hooks/useModelCatalog'
 import type { UseProfileResult } from '../hooks/useProfile'
 import {
   ACTIVITY_LEVELS,
@@ -20,11 +17,9 @@ interface ProfileScreenProps {
   // Les états vivent dans App : une seconde instance de ces hooks ne verrait
   // pas ce qui est enregistré ici.
   profileStore: UseProfileResult
-  aiSettings: UseAiSettingsResult
-  modelCatalog: UseModelCatalogResult
 }
 
-export function ProfileScreen({ profileStore, aiSettings, modelCatalog }: ProfileScreenProps) {
+export function ProfileScreen({ profileStore }: ProfileScreenProps) {
   const { profile, loaded, saveState, update, save } = profileStore
   const bmi = computeBmi(profile.heightCm, profile.weightKg)
 
@@ -139,8 +134,6 @@ export function ProfileScreen({ profileStore, aiSettings, modelCatalog }: Profil
           </div>
         </div>
       </SectionCard>
-
-      <AiSettingsSection modelCatalog={modelCatalog} settings={aiSettings} />
 
       <SectionCard
         aside={
