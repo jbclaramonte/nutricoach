@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dbGet, dbSet } from '../lib/db'
+import { dbDelete, dbGet, dbKeys, dbSet } from '../lib/db'
 import { fileToDataUrl } from '../lib/ai/images'
 import { buildCoachSystemPrompt } from '../lib/ai/prompts'
 import type { GeneratedMenu } from '../lib/ai/menuSchema'
@@ -12,10 +12,40 @@ import { streamComplete } from '../lib/openrouter/client'
 import { describeError } from '../lib/openrouter/errors'
 import type { ORModel } from '../lib/openrouter/types'
 
-const KEY = 'chat:messages'
-// L'historique complet part à chaque tour : le plafond borne à la fois le coût
-// des appels et la place prise dans IndexedDB.
+const KEY_PREFIX = 'chat:'
+// Chaque question part seule au modèle : le plafond ne borne donc que la place
+// prise dans IndexedDB par l'historique affiché.
 const MAX_MESSAGES = 100
+
+/** Clé du jour : une conversation par date, au format AAAA-MM-JJ. */
+function todayKey(): string {
+  const now = new Date()
+  const month = `${now.getMonth() + 1}`.padStart(2, '0')
+  const day = `${now.getDate()}`.padStart(2, '0')
+  return `${KEY_PREFIX}${now.getFullYear()}-${month}-${day}`
+}
+
+/**
+ * Sans ménage, le magasin accumulerait une conversation par jour indéfiniment :
+ * les entrées antérieures à celle du jour sont supprimées au chargement.
+ */
+function purgeOldChats(currentKey: string): Promise<void> {
+  return dbKeys()
+    .then((keys) =>
+      Promise.all(
+        keys
+          // « chat:messages » est l'ancien fil unique, antérieur au découpage par
+          // jour. Il trie après les clés datées et échapperait à la comparaison.
+          .filter(
+            (key) =>
+              key.startsWith(KEY_PREFIX) && (key < currentKey || key === 'chat:messages'),
+          )
+          .map((key) => dbDelete(key)),
+      ),
+    )
+    .then(() => undefined)
+    .catch((purgeError) => console.error('[chat] purge impossible', purgeError))
+}
 
 export type ChatState = 'idle' | 'streaming' | 'error'
 
@@ -67,7 +97,9 @@ export function useCoachChat(
 
   useEffect(() => {
     let cancelled = false
-    dbGet<ChatMessage[]>(KEY)
+    const key = todayKey()
+    void purgeOldChats(key)
+    dbGet<ChatMessage[]>(key)
       .then((stored) => {
         if (!cancelled && stored) applyMessages(stored)
       })
@@ -85,7 +117,7 @@ export function useCoachChat(
     // Tant que la lecture initiale n'a pas répondu, écrire effacerait
     // l'historique déjà enregistré.
     if (!loaded.current) return
-    dbSet(KEY, next).catch((writeError) => console.error('[chat] écriture impossible', writeError))
+    dbSet(todayKey(), next).catch((writeError) => console.error('[chat] écriture impossible', writeError))
   }, [])
 
   const send = useCallback(
@@ -129,8 +161,11 @@ export function useCoachChat(
           }
           const reply: ChatMessage = { id: replyId, role: 'assistant', text: '', at: Date.now() }
 
-          const history = capped([...messagesRef.current, userMessage])
-          applyMessages([...history, reply])
+          // Chaque question est traitée seule : les tours précédents sont
+          // conservés pour l'affichage mais ne repartent jamais au modèle. Le
+          // prompt système porte déjà le profil, les activités et le menu du
+          // jour, c'est-à-dire le contexte qui compte.
+          applyMessages([...capped([...messagesRef.current, userMessage]), reply])
 
           const abort = new AbortController()
           controller.current = abort
@@ -140,7 +175,7 @@ export function useCoachChat(
             model: settings.modelId,
             messages: toOrMessages(
               buildCoachSystemPrompt(profile, activities, todaysMenu ?? undefined),
-              history,
+              [userMessage],
             ),
             temperature: 0.6,
             maxTokens: 1200,
