@@ -1,3 +1,4 @@
+import type { Activity } from '../lib/activities'
 import type { DashboardData } from '../types'
 
 const IMG =
@@ -35,6 +36,7 @@ export const dashboardData: DashboardData = {
     {
       id: 'breakfast',
       slot: 'breakfast',
+      time: '07:30',
       slotLabel: 'Petit-déjeuner',
       title: 'Bowl Avoine & Fruits Rouges',
       imageAlt: "Bowl d'avoine crémeuse aux fruits rouges et graines de chia",
@@ -51,6 +53,7 @@ export const dashboardData: DashboardData = {
     {
       id: 'lunch',
       slot: 'lunch',
+      time: '12:30',
       slotLabel: 'Déjeuner',
       title: 'Saumon Grillé & Quinoa Vert',
       imageAlt: 'Pavé de saumon grillé sur lit de quinoa vert et asperges rôties',
@@ -67,6 +70,7 @@ export const dashboardData: DashboardData = {
     {
       id: 'dinner',
       slot: 'dinner',
+      time: '19:30',
       slotLabel: 'Dîner',
       title: 'Mijoté de Lentilles Douces',
       imageAlt: 'Mijoté de lentilles et légumes rôtis dans un bol en céramique mate',
@@ -84,6 +88,7 @@ export const dashboardData: DashboardData = {
     {
       id: 'snack',
       slot: 'snack',
+      time: '16:30',
       slotLabel: 'Collation',
       title: 'Amandes et Pomme',
       imageAlt: 'Amandes et pomme fraîche sur une planche en bois clair',
@@ -97,3 +102,23 @@ export const dashboardData: DashboardData = {
     },
   ],
 }
+
+/** Activités de la journée de démonstration, remplacées par la saisie réelle. */
+export const defaultActivities: Activity[] = [
+  {
+    id: 'gym-morning',
+    time: '07:00',
+    typeId: 'gym',
+    title: 'Gym & Réveil articulaire',
+    durationMin: 25,
+    impact: 'Métabolisme réveillé • Hydratation prioritaire',
+  },
+  {
+    id: 'bike-commute',
+    time: '11:30',
+    typeId: 'bike',
+    title: 'Trajet Vélo urbain',
+    durationMin: 35,
+    impact: 'Déjeuner réajusté : +0.5L hydratation & +15g glucides lents',
+  },
+]

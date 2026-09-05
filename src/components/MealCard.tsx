@@ -30,8 +30,15 @@ export function MealCard({ meal, onToggleEaten }: MealCardProps) {
       <div className="flex flex-col gap-sm p-4">
         <div className="mb-sm flex items-start justify-between">
           <div>
-            <h3 className="font-headline-md text-headline-md text-on-surface">{meal.slotLabel}</h3>
-            <p className="font-body-md text-body-md text-on-surface-variant">{meal.title}</p>
+            <div className="flex flex-wrap items-baseline gap-xs">
+              <span className="whitespace-nowrap text-caption font-bold text-primary">
+                {meal.time}
+              </span>
+              <span className="whitespace-nowrap text-caption text-on-surface-variant">
+                • {meal.slotLabel}
+              </span>
+            </div>
+            <h3 className="font-headline-md text-headline-md text-on-surface">{meal.title}</h3>
           </div>
           <button
             aria-label={meal.eaten ? `Marquer ${meal.slotLabel} comme non pris` : `Marquer ${meal.slotLabel} comme pris`}

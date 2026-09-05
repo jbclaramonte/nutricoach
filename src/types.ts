@@ -19,6 +19,8 @@ export interface Meal {
   slotLabel: string
   /** Nom de la recette proposée. */
   title: string
+  /** Heure prévue au format HH:MM, utilisée pour ordonner la chronologie. */
+  time: string
   imageUrl: string
   imageAlt: string
   /** Badge posé sur la photo, par ex. « Suggestion Modifiée ». */
