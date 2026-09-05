@@ -126,6 +126,12 @@ export function buildCoachSystemPrompt(
   return blocks.join('\n\n')
 }
 
+/** Forme attendue, rappelée aux modèles qui n'acceptent pas le schéma strict. */
+const RAW_JSON_INSTRUCTION = [
+  'Réponds uniquement par un objet JSON brut, sans texte autour, sans bloc de code, à cette forme exacte :',
+  '{"date":"AAAA-MM-JJ","banner":"...","meals":[{"slot":"breakfast","slotLabel":"Petit-déjeuner","title":"...","time":"08:00","rationale":"...","items":[{"name":"...","quantity":"130g","calories":0,"protein":0,"fiber":0}]}]}',
+]
+
 /** Tour utilisateur demandant le menu du jour. */
 export function buildMenuRequest(dateLabel: string, hasStructuredOutputs: boolean): string {
   const lines = [
@@ -135,10 +141,45 @@ export function buildMenuRequest(dateLabel: string, hasStructuredOutputs: boolea
   ]
 
   if (!hasStructuredOutputs) {
-    lines.push(
-      'Réponds uniquement par un objet JSON brut, sans texte autour, sans bloc de code, à cette forme exacte :',
-      '{"date":"AAAA-MM-JJ","banner":"...","meals":[{"slot":"breakfast","slotLabel":"Petit-déjeuner","title":"...","time":"08:00","rationale":"...","items":[{"name":"...","quantity":"130g","calories":0,"protein":0,"fiber":0}]}]}',
-    )
+    lines.push(...RAW_JSON_INSTRUCTION)
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * Tour utilisateur demandant la réécriture du menu du jour. Les repas déjà pris
+ * sont gelés : ils sont redemandés à l'identique pour que la réponse reste un
+ * menu complet et valide, sans quoi la journée perdrait ce qui a été mangé.
+ */
+export function buildRevisionRequest(
+  menu: GeneratedMenu,
+  frozenSlots: string[],
+  consumedKcal: number,
+  remainingKcal: number,
+  request: string,
+  hasStructuredOutputs: boolean,
+): string {
+  const lines = [
+    'MENU ACTUEL',
+    describeMenu(menu),
+    '',
+    'DEMANDE DE L’UTILISATEUR',
+    request,
+    '',
+    'CONTRAINTES DE RÉÉCRITURE',
+    frozenSlots.length > 0
+      ? `Repas déjà pris, donc gelés : ${frozenSlots.join(', ')}. Renvoie-les MOT POUR MOT, avec exactement les mêmes aliments, quantités et valeurs. Il est interdit de les modifier, de les renommer ou de les supprimer.`
+      : 'Aucun repas n’a encore été pris : tous les repas peuvent être modifiés.',
+    `Calories déjà consommées aujourd’hui : ${consumedKcal} kcal.`,
+    `Calories restantes pour le reste de la journée : ${remainingKcal} kcal.`,
+    'Rééquilibre les repas non gelés pour que leur total tienne dans ces calories restantes.',
+    'Renvoie le MENU COMPLET : tous les repas de la journée, repas gelés inclus, dans l’ordre chronologique.',
+    'Ne renvoie aucun texte autour du menu, aucun commentaire, aucune explication.',
+  ]
+
+  if (!hasStructuredOutputs) {
+    lines.push('', ...RAW_JSON_INSTRUCTION)
   }
 
   return lines.join('\n')

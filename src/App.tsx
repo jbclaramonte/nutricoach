@@ -101,10 +101,17 @@ export default function App() {
           configured={configured}
           error={error}
           messages={messages}
+          hasMenu={dailyMenu.menu !== null}
+          onApplyToMenu={(request) => {
+            void dailyMenu.revise(request)
+          }}
           onClear={clear}
           onSend={handleSend}
           onStop={stop}
           online={online}
+          reviseError={dailyMenu.reviseError}
+          reviseNotice={dailyMenu.reviseNotice}
+          revising={dailyMenu.reviseState === 'revising'}
           streaming={state === 'streaming'}
         />
       )}

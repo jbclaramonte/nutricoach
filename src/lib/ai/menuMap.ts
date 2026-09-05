@@ -1,6 +1,7 @@
 import type { MacroRing, Meal } from '../../types'
 import { sumMeal } from '../nutrition'
 import { SLOT_IMAGES } from '../../data/dashboard'
+import { mealId } from './menuRevise'
 import type { GeneratedMenu } from './menuSchema'
 
 /**
@@ -20,13 +21,13 @@ function ratio(value: number, target: number): number {
  * Complète le menu généré avec ce que le modèle ne produit pas : identifiant
  * stable, illustration déterministe par créneau, état « pris ».
  */
-export function toDashboardMeals(menu: GeneratedMenu): Meal[] {
+export function toDashboardMeals(menu: GeneratedMenu, eatenIds: string[] = []): Meal[] {
   return menu.meals.map((meal, index) => {
     const image = SLOT_IMAGES[meal.slot]
     return {
       // Le créneau ne suffit pas : deux collations partageraient le même
       // identifiant, donc la même clé React et le même état « pris ».
-      id: `${index}-${meal.slot}`,
+      id: mealId(index, meal),
       slot: meal.slot,
       slotLabel: meal.slotLabel,
       title: meal.title,
@@ -41,7 +42,7 @@ export function toDashboardMeals(menu: GeneratedMenu): Meal[] {
         protein: item.protein,
         fiber: item.fiber,
       })),
-      eaten: false,
+      eaten: eatenIds.includes(mealId(index, meal)),
     }
   })
 }

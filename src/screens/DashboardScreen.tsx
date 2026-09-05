@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ActivityCard } from '../components/ActivityCard'
 import { AddActivityForm } from '../components/AddActivityForm'
 import { Icon } from '../components/Icon'
@@ -12,7 +12,6 @@ import { toMacroRings } from '../lib/ai/menuMap'
 import { dailyTarget } from '../lib/energy'
 import { buildTimeline } from '../lib/timeline'
 import type { Profile } from '../lib/profile'
-import type { Meal } from '../types'
 
 interface DashboardScreenProps {
   profile: Profile
@@ -29,24 +28,11 @@ export function DashboardScreen({
   configured,
 }: DashboardScreenProps) {
   const { activities, add, remove } = activityStore
-  const { menu, meals: generatedMeals, state, error, dropped, generate } = dailyMenu
-  const [meals, setMeals] = useState<Meal[]>([])
+  const { menu, meals, state, error, dropped, generate, toggleEaten } = dailyMenu
   const [adding, setAdding] = useState(false)
-
-  // Le menu généré fait autorité ; les repas locaux ne portent que l'état « pris ».
-  useEffect(() => {
-    setMeals(generatedMeals)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [menu])
 
   const timeline = buildTimeline(meals, activities)
   const macros = toMacroRings(meals, dailyTarget(profile, activities), profile.weightKg)
-
-  function toggleEaten(mealId: string) {
-    setMeals((current) =>
-      current.map((meal) => (meal.id === mealId ? { ...meal, eaten: !meal.eaten } : meal)),
-    )
-  }
 
   return (
     <div className="flex w-full flex-col gap-lg px-margin-mobile pb-40 pt-sm">

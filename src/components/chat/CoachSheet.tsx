@@ -17,6 +17,15 @@ interface CoachSheetProps {
   onSend: (message: string, photo: File | null) => void
   onStop: () => void
   onClear: () => void
+  /** Vrai quand un menu du jour existe : sans lui, rien à réviser. */
+  hasMenu: boolean
+  /** Applique la dernière demande de l'utilisateur au menu du jour. */
+  onApplyToMenu: (request: string) => void
+  revising: boolean
+  /** Phrase française du dernier échec de révision, vide sinon. */
+  reviseError: string
+  /** Phrase française résumant la dernière révision réussie, vide sinon. */
+  reviseNotice: string
 }
 
 export function CoachSheet({
@@ -29,8 +38,24 @@ export function CoachSheet({
   onSend,
   onStop,
   onClear,
+  hasMenu,
+  onApplyToMenu,
+  revising,
+  reviseError,
+  reviseNotice,
 }: CoachSheetProps) {
   const bottom = useRef<HTMLDivElement>(null)
+
+  // La révision part de ce que l'utilisateur a demandé, pas de la réponse du
+  // coach : celle-ci n'est proposée que sous le dernier tour du coach.
+  const last = messages[messages.length - 1]
+  const lastRequest = [...messages].reverse().find((message) => message.role === 'user')?.text ?? ''
+  const canApply =
+    hasMenu &&
+    !streaming &&
+    last?.role === 'assistant' &&
+    !last.failed &&
+    lastRequest.trim().length > 0
 
   // Le flux arrive par petits morceaux : on suit le bas à chaque mise à jour.
   useEffect(() => {
@@ -94,6 +119,26 @@ export function CoachSheet({
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}
+
+        {canApply && (
+          <div className="flex flex-col gap-xs self-start">
+            <button
+              className="flex items-center gap-xs rounded-full bg-surface-container px-md py-1 font-label-md text-caption text-primary transition-colors active:bg-surface-container-highest disabled:opacity-60"
+              disabled={revising}
+              onClick={() => onApplyToMenu(lastRequest)}
+              type="button"
+            >
+              <Icon className="text-caption" name="restaurant_menu" />
+              {revising ? 'Mise à jour du menu…' : 'Appliquer au menu'}
+            </button>
+            {reviseError && (
+              <p className="font-body-md text-caption text-error">{reviseError}</p>
+            )}
+            {!reviseError && reviseNotice && (
+              <p className="font-body-md text-caption text-on-surface-variant">{reviseNotice}</p>
+            )}
+          </div>
+        )}
 
         {error && (
           <p className="rounded-xl bg-error-container p-sm font-body-md text-body-md text-on-error-container">

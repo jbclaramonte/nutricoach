@@ -4,7 +4,14 @@ import { findAllergyViolations } from '../lib/ai/allergies'
 import { parseMenu } from '../lib/ai/menuParse'
 import { toDashboardMeals } from '../lib/ai/menuMap'
 import { MENU_JSON_SCHEMA, type GeneratedMenu } from '../lib/ai/menuSchema'
-import { buildCoachSystemPrompt, buildMenuRequest } from '../lib/ai/prompts'
+import { buildCoachSystemPrompt, buildMenuRequest, buildRevisionRequest } from '../lib/ai/prompts'
+import {
+  consumedCalories,
+  mealId,
+  restoreFrozenMeals,
+  summariseChanges,
+} from '../lib/ai/menuRevise'
+import { dailyTarget } from '../lib/energy'
 import { isConfigured } from '../lib/ai/settings'
 import type { AiSettings } from '../lib/ai/settings'
 import type { Activity } from '../lib/activities'
@@ -19,9 +26,13 @@ interface StoredMenu {
   generatedAt: number
   modelId: string
   menu: GeneratedMenu
+  /** Identifiants des repas déjà pris, portés par le menu du jour lui-même. */
+  eatenIds?: string[]
 }
 
 export type MenuState = 'idle' | 'loading' | 'ready' | 'error'
+
+export type ReviseState = 'idle' | 'revising' | 'error'
 
 export interface UseDailyMenuResult {
   menu: GeneratedMenu | null
@@ -33,6 +44,15 @@ export interface UseDailyMenuResult {
   dropped: string[]
   generatedAt: Date | null
   generate: () => void
+  /** Bascule l'état « pris » d'un repas, enregistré avec le menu du jour. */
+  toggleEaten: (mealId: string) => void
+  /** Réécrit le menu du jour à partir d'une demande en langage naturel. */
+  revise: (request: string) => Promise<void>
+  reviseState: ReviseState
+  /** Phrase française expliquant le dernier échec de révision. */
+  reviseError: string
+  /** Phrase française résumant la dernière révision réussie. */
+  reviseNotice: string
 }
 
 const KEY_PREFIX = 'menu:'
@@ -83,7 +103,20 @@ export function useDailyMenu(
   const [state, setState] = useState<MenuState>('idle')
   const [error, setError] = useState('')
   const [dropped, setDropped] = useState<string[]>([])
+  const [reviseState, setReviseState] = useState<ReviseState>('idle')
+  const [reviseError, setReviseError] = useState('')
+  const [reviseNotice, setReviseNotice] = useState('')
   const loaded = useRef(false)
+  // Miroir synchrone du menu enregistré : la révision lit l'état courant hors
+  // rendu, où `stored` serait celui capturé à la création du callback.
+  const storedRef = useRef<StoredMenu | null>(null)
+
+  /** Unique point d'écriture du menu : garde le miroir et le magasin à jour. */
+  const applyStored = useCallback((next: StoredMenu) => {
+    storedRef.current = next
+    setStored(next)
+    return dbSet(todayKey(), next)
+  }, [])
 
   useEffect(() => {
     // Les allergies sont relues du menu en cache : tant que le profil enregistré
@@ -105,6 +138,7 @@ export function useDailyMenu(
           setState('error')
           return
         }
+        storedRef.current = cached
         setStored(cached)
         setState('ready')
       })
@@ -175,17 +209,21 @@ export function useDailyMenu(
           )
         }
 
+        // Un menu neuf remet la journée à zéro : les repas pris étaient ceux
+        // du menu précédent.
         const next: StoredMenu = {
           generatedAt: Date.now(),
           modelId: settings.modelId,
           menu: parsed.menu,
+          eatenIds: [],
         }
         loaded.current = true
-        setStored(next)
         setDropped(parsed.dropped)
+        setReviseError('')
+        setReviseNotice('')
         setState('ready')
 
-        await dbSet(todayKey(), next)
+        await applyStored(next)
       })
       .catch((generateError) => {
         // Le menu déjà enregistré reste à l'écran : un échec n'efface rien.
@@ -197,7 +235,129 @@ export function useDailyMenu(
         )
         setState('error')
       })
-  }, [activities, models, profile, settings])
+  }, [activities, applyStored, models, profile, settings])
+
+  const toggleEaten = useCallback(
+    (id: string) => {
+      const current = storedRef.current
+      if (!current) return
+      const eatenIds = current.eatenIds ?? []
+      const next: StoredMenu = {
+        ...current,
+        eatenIds: eatenIds.includes(id)
+          ? eatenIds.filter((entry) => entry !== id)
+          : [...eatenIds, id],
+      }
+      applyStored(next).catch((writeError) =>
+        console.error('[menu] écriture impossible', writeError),
+      )
+    },
+    [applyStored],
+  )
+
+  const revise = useCallback(
+    async (request: string) => {
+      const current = storedRef.current
+      if (!current || !isConfigured(settings) || !request.trim()) return
+
+      const model = models.find((entry) => entry.id === settings.modelId)
+      const jsonSchema = model?.supportsStructuredOutputs ? MENU_JSON_SCHEMA : undefined
+
+      const eatenIds = current.eatenIds ?? []
+      const frozenSlots = current.menu.meals
+        .filter((meal, index) => eatenIds.includes(mealId(index, meal)))
+        .map((meal) => meal.slotLabel)
+      const consumedKcal = Math.round(consumedCalories(current.menu, eatenIds))
+      const remainingKcal = Math.max(0, dailyTarget(profile, activities) - consumedKcal)
+
+      const messages: ORMessage[] = [
+        { role: 'system', content: buildCoachSystemPrompt(profile, activities) },
+        {
+          role: 'user',
+          content: buildRevisionRequest(
+            current.menu,
+            frozenSlots,
+            consumedKcal,
+            remainingKcal,
+            request,
+            jsonSchema !== undefined,
+          ),
+        },
+      ]
+
+      setReviseState('revising')
+      setReviseError('')
+      setReviseNotice('')
+
+      const ask = () =>
+        complete({
+          apiKey: settings.apiKey.trim(),
+          model: settings.modelId,
+          messages,
+          jsonSchema,
+          temperature: 0.4,
+          maxTokens: 2500,
+        })
+
+      try {
+        const raw = await ask()
+        let parsed = parseMenu(raw)
+        if (!parsed.ok) throw new Error(PARSE_MESSAGES[parsed.reason])
+
+        let violations = findAllergyViolations(parsed.menu, profile.allergies)
+        if (violations.length > 0) {
+          // Même règle qu'à la génération : une révision ne doit pas devenir un
+          // contournement du contrôle d'allergies.
+          messages.push({ role: 'assistant', content: raw })
+          messages.push({
+            role: 'user',
+            content: [
+              `Ce menu contient ${violations[0].allergen} (${violations[0].where}), un allergène strictement interdit.`,
+              "Remplace l'ingrédient fautif par une alternative sûre et renvoie le menu complet, au même format.",
+            ].join('\n'),
+          })
+          const retry = await ask()
+          parsed = parseMenu(retry)
+          if (!parsed.ok) throw new Error(PARSE_MESSAGES[parsed.reason])
+          violations = findAllergyViolations(parsed.menu, profile.allergies)
+        }
+
+        if (violations.length > 0) {
+          throw new Error(
+            `Révision rejetée : le modèle continue de proposer ${violations[0].allergen}, déclaré comme allergie. Changez de modèle avant de réessayer.`,
+          )
+        }
+
+        const { menu: guarded, restored } = restoreFrozenMeals(current.menu, parsed.menu, eatenIds)
+
+        const next: StoredMenu = {
+          ...current,
+          generatedAt: Date.now(),
+          modelId: settings.modelId,
+          menu: guarded,
+        }
+        setDropped([
+          ...parsed.dropped,
+          ...restored.map((slotLabel) => `${slotLabel} (déjà pris, laissé inchangé)`),
+        ])
+        setReviseNotice(summariseChanges(current.menu, guarded))
+        setReviseState('idle')
+        setState('ready')
+
+        await applyStored(next)
+      } catch (reviseFailure) {
+        // Le menu enregistré reste à l'écran : un échec de révision n'efface rien.
+        console.error('[menu] révision impossible', reviseFailure)
+        setReviseError(
+          reviseFailure instanceof Error && !('kind' in reviseFailure)
+            ? reviseFailure.message
+            : describeError(reviseFailure),
+        )
+        setReviseState('error')
+      }
+    },
+    [activities, applyStored, models, profile, settings],
+  )
 
   // Dernier filet, évalué à chaque rendu : déclarer une allergie doit retirer
   // immédiatement un menu déjà affiché, sans attendre ni régénération ni
@@ -208,7 +368,7 @@ export function useDailyMenu(
 
   return {
     menu: blocked ? null : (stored?.menu ?? null),
-    meals: blocked || !stored ? [] : toDashboardMeals(stored.menu),
+    meals: blocked || !stored ? [] : toDashboardMeals(stored.menu, stored.eatenIds ?? []),
     state: blocked ? 'error' : state,
     error: blocked
       ? `Menu masqué : il contient ${liveViolations[0].allergen} (${liveViolations[0].where}), déclaré comme allergie. Générez un nouveau menu.`
@@ -216,5 +376,10 @@ export function useDailyMenu(
     dropped: blocked ? [] : dropped,
     generatedAt: stored ? new Date(stored.generatedAt) : null,
     generate,
+    toggleEaten,
+    revise,
+    reviseState,
+    reviseError,
+    reviseNotice: blocked ? '' : reviseNotice,
   }
 }
