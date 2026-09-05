@@ -47,13 +47,9 @@ export interface MicroNutrient {
 }
 
 export interface DashboardData {
-  /** Message adaptatif affiché en haut de l'écran. */
-  banner: { highlight: string; message: string }
   /** Date du menu, déjà formatée en français. */
   dateLabel: string
-  macros: MacroRing[]
   micros: MicroNutrient[]
-  meals: Meal[]
   user: { name: string; avatarUrl: string }
   coach: { name: string }
   logoUrl: string

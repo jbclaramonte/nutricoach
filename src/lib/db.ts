@@ -41,3 +41,15 @@ export function dbGet<T>(key: string): Promise<T | undefined> {
 export function dbSet<T>(key: string, value: T): Promise<void> {
   return run('readwrite', (store) => store.put(value, key) as IDBRequest<IDBValidKey>).then(() => undefined)
 }
+
+/** Supprime une clé ; ne fait rien si elle est absente. */
+export function dbDelete(key: string): Promise<void> {
+  return run('readwrite', (store) => store.delete(key) as IDBRequest<undefined>).then(() => undefined)
+}
+
+/** Liste les clés existantes, pour faire le ménage des entrées périmées. */
+export function dbKeys(): Promise<string[]> {
+  return run<IDBValidKey[]>('readonly', (store) => store.getAllKeys()).then((keys) =>
+    keys.filter((key): key is string => typeof key === 'string'),
+  )
+}

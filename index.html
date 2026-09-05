@@ -7,6 +7,16 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <meta name="theme-color" content="#006c46" />
+    <!--
+      La clé API de l'utilisateur vit dans ce navigateur : on restreint les
+      destinations possibles pour qu'un script injecté ne puisse pas l'exfiltrer.
+      connect-src n'autorise qu'OpenRouter ; les polices, images et styles sont
+      limités aux origines effectivement utilisées.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src 'self' https://openrouter.ai; img-src 'self' data: blob: https://lh3.googleusercontent.com https://images.unsplash.com; font-src https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'"
+    />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />

@@ -1,8 +1,11 @@
 import { Icon } from '../components/Icon'
+import { AiSettingsSection } from '../components/profile/AiSettingsSection'
 import { ChipInput } from '../components/profile/ChipInput'
 import { NumberField } from '../components/profile/NumberField'
 import { SectionCard } from '../components/profile/SectionCard'
-import { useProfile } from '../hooks/useProfile'
+import type { UseAiSettingsResult } from '../hooks/useAiSettings'
+import type { UseModelCatalogResult } from '../hooks/useModelCatalog'
+import type { UseProfileResult } from '../hooks/useProfile'
 import {
   ACTIVITY_LEVELS,
   GOALS,
@@ -13,8 +16,16 @@ import {
   type Sex,
 } from '../lib/profile'
 
-export function ProfileScreen() {
-  const { profile, loaded, saveState, update, save } = useProfile()
+interface ProfileScreenProps {
+  // Les états vivent dans App : une seconde instance de ces hooks ne verrait
+  // pas ce qui est enregistré ici.
+  profileStore: UseProfileResult
+  aiSettings: UseAiSettingsResult
+  modelCatalog: UseModelCatalogResult
+}
+
+export function ProfileScreen({ profileStore, aiSettings, modelCatalog }: ProfileScreenProps) {
+  const { profile, loaded, saveState, update, save } = profileStore
   const bmi = computeBmi(profile.heightCm, profile.weightKg)
 
   if (!loaded) {
@@ -128,6 +139,8 @@ export function ProfileScreen() {
           </div>
         </div>
       </SectionCard>
+
+      <AiSettingsSection modelCatalog={modelCatalog} settings={aiSettings} />
 
       <SectionCard
         aside={

@@ -1,9 +1,18 @@
 import { AppHeader } from './components/AppHeader'
 import { BottomNav } from './components/BottomNav'
 import { ChatBar } from './components/ChatBar'
+import { CoachSheet } from './components/chat/CoachSheet'
 import { dashboardData } from './data/dashboard'
 import { NAV_ITEMS } from './lib/navigation'
+import { useActivities } from './hooks/useActivities'
+import { useAiSettings } from './hooks/useAiSettings'
+import { useCoachChat } from './hooks/useCoachChat'
+import { useDailyMenu } from './hooks/useDailyMenu'
 import { useHashRoute } from './hooks/useHashRoute'
+import { useModelCatalog } from './hooks/useModelCatalog'
+import { useOnline } from './hooks/useOnline'
+import { useProfile } from './hooks/useProfile'
+import { isConfigured } from './lib/ai/settings'
 import { DashboardScreen } from './screens/DashboardScreen'
 import { PlaceholderScreen } from './screens/PlaceholderScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
@@ -11,13 +20,42 @@ import { ProfileScreen } from './screens/ProfileScreen'
 export default function App() {
   const route = useHashRoute('dashboard')
   const navItem = NAV_ITEMS.find((item) => item.route === route)
-  // Le coach n'est joignable que depuis le menu du jour.
-  const showChat = route === 'dashboard'
+  // Le coach est ouvert par-dessus le dashboard : la barre de chat n'est donc
+  // visible que sur ces deux routes.
+  const isCoach = route === 'coach'
+  const showChat = route === 'dashboard' || isCoach
 
-  // Le coach IA n'est pas encore branché : l'envoi est journalisé en attendant
-  // l'intégration du LLM.
+  // L'état partagé vit ici : le dashboard et le coach doivent voir le même
+  // menu, sans quoi une génération resterait invisible du chat jusqu'au
+  // prochain chargement.
+  const activityStore = useActivities()
+  const profileStore = useProfile()
+  const aiSettings = useAiSettings()
+  const modelCatalog = useModelCatalog()
+  const { profile } = profileStore
+  const { settings } = aiSettings
+  const { models } = modelCatalog
+  const dailyMenu = useDailyMenu(
+    settings,
+    profile,
+    profileStore.loaded,
+    activityStore.activities,
+    models,
+  )
+  const online = useOnline()
+  const { messages, state, error, send, stop, clear } = useCoachChat(
+    settings,
+    profile,
+    activityStore.activities,
+    dailyMenu.menu,
+    models,
+  )
+
+  const configured = isConfigured(settings)
+
   function handleSend(message: string, photo: File | null) {
-    console.info('[coach] message en attente d’envoi', { message, photo: photo?.name ?? null })
+    if (!isCoach) window.location.hash = '#/coach'
+    send(message, photo)
   }
 
   return (
@@ -30,7 +68,11 @@ export default function App() {
 
       <main className="min-h-screen bg-background pb-20 pt-16">
         {route === 'profil' ? (
-          <ProfileScreen />
+          <ProfileScreen
+            aiSettings={aiSettings}
+            modelCatalog={modelCatalog}
+            profileStore={profileStore}
+          />
         ) : route === 'progress' ? (
           <PlaceholderScreen
             description="Le suivi du poids et des tendances de macros arrivera ici."
@@ -44,11 +86,36 @@ export default function App() {
             title="Recettes"
           />
         ) : (
-          <DashboardScreen />
+          <DashboardScreen
+            activities={activityStore}
+            configured={configured}
+            dailyMenu={dailyMenu}
+            profile={profile}
+          />
         )}
       </main>
 
-      {showChat && <ChatBar coachName={dashboardData.coach.name} onSend={handleSend} />}
+      {isCoach && (
+        <CoachSheet
+          coachName={dashboardData.coach.name}
+          configured={configured}
+          error={error}
+          messages={messages}
+          onClear={clear}
+          onSend={handleSend}
+          onStop={stop}
+          online={online}
+          streaming={state === 'streaming'}
+        />
+      )}
+
+      {showChat && !isCoach && (
+        <ChatBar
+          coachName={dashboardData.coach.name}
+          disabled={!configured || !online}
+          onSend={handleSend}
+        />
+      )}
       <BottomNav activeRoute={navItem?.route ?? 'dashboard'} />
     </div>
   )

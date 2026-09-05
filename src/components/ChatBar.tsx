@@ -6,9 +6,11 @@ interface ChatBarProps {
   coachName: string
   /** Appelé à l'envoi ; la photo est optionnelle. */
   onSend: (message: string, photo: File | null) => void
+  /** Verrouille la saisie tant que le coach IA n'est pas configuré. */
+  disabled?: boolean
 }
 
-export function ChatBar({ coachName, onSend }: ChatBarProps) {
+export function ChatBar({ coachName, onSend, disabled = false }: ChatBarProps) {
   const [message, setMessage] = useState('')
   const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -19,7 +21,7 @@ export function ChatBar({ coachName, onSend }: ChatBarProps) {
     setPhoto(file ? { file, url: URL.createObjectURL(file) } : null)
   }
 
-  const canSend = message.trim().length > 0 || photo !== null
+  const canSend = !disabled && (message.trim().length > 0 || photo !== null)
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -62,6 +64,7 @@ export function ChatBar({ coachName, onSend }: ChatBarProps) {
         <button
           aria-label="Joindre une photo"
           className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-on-surface-variant transition-colors active:bg-surface-container-highest"
+          disabled={disabled}
           onClick={() => fileInput.current?.click()}
           type="button"
         >
@@ -69,8 +72,11 @@ export function ChatBar({ coachName, onSend }: ChatBarProps) {
         </button>
         <input
           className="min-w-0 flex-1 bg-transparent font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none"
+          disabled={disabled}
           onChange={(event) => setMessage(event.target.value)}
-          placeholder={`Message à ${coachName}...`}
+          placeholder={
+            disabled ? 'Configurez votre clé OpenRouter dans Profil' : `Message à ${coachName}...`
+          }
           type="text"
           value={message}
         />
