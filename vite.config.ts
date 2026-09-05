@@ -36,6 +36,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Le cycle de dev est court : la nouvelle version prend la main dès le
+        // premier chargement au lieu d'attendre la fermeture de tous les onglets.
+        clientsClaim: true,
+        skipWaiting: true,
         globPatterns: ['**/*.{js,css,html,svg,png,webp,woff2}'],
         runtimeCaching: [
           {
