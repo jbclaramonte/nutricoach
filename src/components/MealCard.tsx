@@ -1,0 +1,86 @@
+import type { Meal } from '../types'
+import { formatGrams, sumMeal } from '../lib/nutrition'
+import { Icon } from './Icon'
+
+interface MealCardProps {
+  meal: Meal
+  onToggleEaten: (mealId: string) => void
+}
+
+export function MealCard({ meal, onToggleEaten }: MealCardProps) {
+  const totals = sumMeal(meal.items)
+
+  return (
+    <article className="flex flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
+      <div
+        aria-label={meal.imageAlt}
+        className="relative h-32 w-full bg-cover bg-center"
+        role="img"
+        style={{ backgroundImage: `url("${meal.imageUrl}")` }}
+      >
+        {meal.badge && (
+          <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/40 to-transparent p-sm">
+            <span className="rounded-lg bg-inverse-surface/80 px-sm py-xs font-label-md text-caption text-inverse-on-surface backdrop-blur-md">
+              {meal.badge}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-sm p-4">
+        <div className="mb-sm flex items-start justify-between">
+          <div>
+            <h3 className="font-headline-md text-headline-md text-on-surface">{meal.slotLabel}</h3>
+            <p className="font-body-md text-body-md text-on-surface-variant">{meal.title}</p>
+          </div>
+          <button
+            aria-label={meal.eaten ? `Marquer ${meal.slotLabel} comme non pris` : `Marquer ${meal.slotLabel} comme pris`}
+            aria-pressed={meal.eaten}
+            className={`flex items-center justify-center rounded-full p-1 transition-colors ${
+              meal.eaten ? 'bg-primary/10 text-primary' : 'bg-surface-container text-on-surface-variant'
+            }`}
+            onClick={() => onToggleEaten(meal.id)}
+            type="button"
+          >
+            <Icon filled={meal.eaten} name={meal.eaten ? 'check_circle' : 'radio_button_unchecked'} />
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-caption">
+            <thead className="border-b border-outline-variant text-on-surface-variant">
+              <tr className="font-label-md">
+                <th className="py-xs pr-xs">Aliment</th>
+                <th className="px-xs py-xs">Qté</th>
+                <th className="px-xs py-xs">kcal</th>
+                <th className="px-xs py-xs">Prot.</th>
+                <th className="py-xs pl-xs">Fibres</th>
+              </tr>
+            </thead>
+            <tbody className="text-on-surface">
+              {meal.items.map((item) => (
+                <tr className="border-b border-outline-variant/30" key={item.name}>
+                  <td className="py-xs pr-xs">{item.name}</td>
+                  <td className="px-xs py-xs">{item.quantity}</td>
+                  <td className="px-xs py-xs">{item.calories}</td>
+                  <td className="px-xs py-xs">{formatGrams(item.protein)}</td>
+                  <td className="py-xs pl-xs">{formatGrams(item.fiber)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="font-bold">
+              <tr className="text-primary">
+                <td className="pt-sm" colSpan={2}>
+                  Total
+                </td>
+                <td className="pt-sm">~{Math.round(totals.calories)}</td>
+                <td className="pt-sm">~{formatGrams(totals.protein)}</td>
+                <td className="pt-sm">~{formatGrams(totals.fiber)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </article>
+  )
+}
