@@ -56,6 +56,8 @@ export default function App() {
     profileStore.loaded,
     activityStore.activities,
     models,
+    todayKey(),
+    true,
   )
   const online = useOnline()
   const { messages, state, error, send, stop, clear } = useCoachChat(
