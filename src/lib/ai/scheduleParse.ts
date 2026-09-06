@@ -31,10 +31,34 @@ function positive(value: unknown): number {
 }
 
 /** Ne garde que des jours ISO valides, sans doublon. */
+const WEEKDAY_NAMES: Record<string, number> = {
+  lundi: 1,
+  mardi: 2,
+  mercredi: 3,
+  jeudi: 4,
+  vendredi: 5,
+  samedi: 6,
+  dimanche: 7,
+}
+
+/**
+ * Accepte le nom du jour, forme demandée au modèle, et l'entier ISO, que
+ * d'anciens plannings enregistrés peuvent encore porter.
+ */
 function parseWeekdays(value: unknown): number[] {
   if (!Array.isArray(value)) return []
   const days = value
-    .filter((day): day is number => typeof day === 'number' && Number.isInteger(day) && day >= 1 && day <= 7)
+    .map((day) => {
+      if (typeof day === 'number' && Number.isInteger(day)) return day
+      if (typeof day !== 'string') return 0
+      const normalised = day
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+      return WEEKDAY_NAMES[normalised] ?? 0
+    })
+    .filter((day) => day >= 1 && day <= 7)
     .sort((a, b) => a - b)
   return days.filter((day, index) => days.indexOf(day) === index)
 }

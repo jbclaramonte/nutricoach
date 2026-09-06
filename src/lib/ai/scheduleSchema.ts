@@ -21,10 +21,17 @@ export const SCHEDULE_JSON_SCHEMA: { name: string; schema: object } = {
           additionalProperties: false,
           required: ['weekdays', 'typeId', 'title', 'time', 'durationMin', 'distanceKm'],
           properties: {
+            // Les jours voyagent en toutes lettres : demander un encodage
+            // numérique à un modèle invite au décalage d'un cran, observé en
+            // conditions réelles (« mardi » rendu en 3). La conversion est faite
+            // ici, où elle est déterministe.
             weekdays: {
               type: 'array',
-              description: 'Jours concernés : 1 = lundi, 7 = dimanche',
-              items: { type: 'integer', minimum: 1, maximum: 7 },
+              description: 'Jours concernés, en toutes lettres et en minuscules',
+              items: {
+                type: 'string',
+                enum: ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'],
+              },
             },
             typeId: { type: 'string', enum: TYPE_IDS, description: 'Type d’activité le plus proche' },
             title: { type: 'string', description: 'Intitulé court, par ex. « Trajet bureau »' },

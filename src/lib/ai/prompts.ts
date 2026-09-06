@@ -226,7 +226,7 @@ export function buildScheduleRequest(notes: string, hasStructuredOutputs: boolea
     "N'invente rien : aucune activité qui ne soit pas mentionnée, aucun jour qui ne soit pas mentionné.",
     "Si le texte ne dit rien d'une activité physique, renvoie une liste vide.",
     `Types disponibles : ${ACTIVITY_TYPES.map((type) => `${type.id} (${type.label})`).join(', ')}.`,
-    'Les jours sont des entiers : 1 = lundi, 7 = dimanche.',
+    'Donne les jours en toutes lettres et en minuscules : lundi, mardi, mercredi, jeudi, vendredi, samedi, dimanche.',
     "Une seule entrée par activité distincte : liste TOUS ses jours dans `weekdays`. Ne répète jamais la même activité une fois par jour.",
     'Pour chaque activité, donne soit une durée en minutes, soit une distance en kilomètres ; mets 0 pour celle qui est inconnue.',
     "Un aller et un retour sont DEUX activités distinctes, à deux moments de la journée : ne les additionne jamais en une seule. Exemple : « je vais au travail en vélo le mardi et le jeudi, 50 minutes aller et 55 minutes retour » donne deux entrées — une le matin de 50 minutes, une en fin de journée de 55 minutes, chacune sur mardi et jeudi.",
