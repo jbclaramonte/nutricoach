@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Activity } from '../lib/activities'
-import { dbGet, dbSet } from '../lib/db'
+import { dbDelete, dbGet, dbSet } from '../lib/db'
 import { plannedActivitiesFor, type RecurringActivity } from '../lib/schedule'
 import { defaultActivities } from '../data/dashboard'
 
@@ -52,7 +52,8 @@ export function useActivities(
           return
         }
         // « activities:today » est l'ancien journal unique : il est repris sous
-        // la clé du jour avant que le ménage ne l'efface.
+        // la clé du jour, puis supprimé enchainé après pour éviter la race avec
+        // le ménage global qui pourrait le supprimer avant qu'on le lise.
         return dbGet<unknown>(LEGACY_KEY).then((legacy) => {
           if (cancelled || !Array.isArray(legacy)) return
           const migrated: StoredDay = {
@@ -60,7 +61,7 @@ export function useActivities(
             dismissedPlannedIds: [],
           }
           setStored(migrated)
-          return dbSet(key, migrated)
+          return dbSet(key, migrated).then(() => dbDelete(LEGACY_KEY))
         })
       })
       .catch((error) => console.error('[activities] lecture impossible', error))

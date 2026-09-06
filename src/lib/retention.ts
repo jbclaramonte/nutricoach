@@ -8,7 +8,7 @@ const DATED_PREFIXES = ['menu:', 'activities:', 'chat:']
  * Clés sans date, héritées du modèle antérieur au découpage par jour. Elles
  * trient après les clés datées et échapperaient à la comparaison.
  */
-const LEGACY_KEYS = ['activities:today', 'chat:messages']
+const LEGACY_KEYS = ['chat:messages']
 
 /** Clés à supprimer : hors de la fenêtre de rétention, ou héritées. */
 export function expiredKeys(keys: string[], oldest: string): string[] {
