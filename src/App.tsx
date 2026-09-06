@@ -1,9 +1,11 @@
+import { useEffect } from 'react'
 import { AppHeader } from './components/AppHeader'
 import { BottomNav } from './components/BottomNav'
 import { ChatBar } from './components/ChatBar'
 import { CoachSheet } from './components/chat/CoachSheet'
 import { dashboardData } from './data/dashboard'
 import { NAV_ITEMS } from './lib/navigation'
+import { purgeExpired } from './lib/retention'
 import { useActivities } from './hooks/useActivities'
 import { useAiSettings } from './hooks/useAiSettings'
 import { useCoachChat } from './hooks/useCoachChat'
@@ -20,6 +22,12 @@ import { ProfileScreen } from './screens/ProfileScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 
 export default function App() {
+  // Le ménage de l'historique est fait une fois, au démarrage : les hooks de
+  // journée ne connaissent plus que la date qu'on leur donne.
+  useEffect(() => {
+    void purgeExpired()
+  }, [])
+
   const route = useHashRoute('dashboard')
   const navItem = NAV_ITEMS.find((item) => item.route === route)
   // Le coach est ouvert par-dessus le dashboard : la barre de chat n'est donc

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dbDelete, dbGet, dbKeys, dbSet } from '../lib/db'
+import { dbGet, dbSet } from '../lib/db'
 import { findAllergyViolations } from '../lib/ai/allergies'
 import { parseMenu } from '../lib/ai/menuParse'
 import { toDashboardMeals } from '../lib/ai/menuMap'
@@ -65,23 +65,6 @@ function todayKey(): string {
   return `${KEY_PREFIX}${now.getFullYear()}-${month}-${day}`
 }
 
-/**
- * Sans ménage, le magasin accumulerait un menu par jour indéfiniment : les
- * entrées antérieures à celle du jour sont supprimées au chargement.
- */
-function purgeOldMenus(currentKey: string): Promise<void> {
-  return dbKeys()
-    .then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key.startsWith(KEY_PREFIX) && key < currentKey)
-          .map((key) => dbDelete(key)),
-      ),
-    )
-    .then(() => undefined)
-    .catch((purgeError) => console.error('[menu] purge impossible', purgeError))
-}
-
 const PARSE_MESSAGES: Record<'not-json' | 'wrong-shape' | 'no-valid-meal', string> = {
   'not-json': "Le modèle n'a pas répondu en JSON : réessayez, ou choisissez un autre modèle.",
   'wrong-shape': "La réponse du modèle n'a pas la forme attendue : réessayez.",
@@ -143,9 +126,6 @@ export function useDailyMenu(
         setState('ready')
       })
       .catch((readError) => console.error('[menu] lecture impossible', readError))
-      .finally(() => {
-        if (!cancelled) void purgeOldMenus(key)
-      })
     return () => {
       cancelled = true
     }

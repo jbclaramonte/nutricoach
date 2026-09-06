@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Activity } from '../lib/activities'
-import { dbDelete, dbGet, dbKeys, dbSet } from '../lib/db'
+import { dbGet, dbSet } from '../lib/db'
 import { plannedActivitiesFor, type RecurringActivity } from '../lib/schedule'
 import { defaultActivities } from '../data/dashboard'
 
@@ -14,29 +14,6 @@ function todayKey(): string {
   const month = `${now.getMonth() + 1}`.padStart(2, '0')
   const day = `${now.getDate()}`.padStart(2, '0')
   return `${KEY_PREFIX}${now.getFullYear()}-${month}-${day}`
-}
-
-/**
- * Sans ménage, le magasin accumulerait un journal par jour indéfiniment : les
- * entrées antérieures à celle du jour sont supprimées au chargement.
- */
-function purgeOldDays(currentKey: string): Promise<void> {
-  return dbKeys()
-    .then((keys) =>
-      Promise.all(
-        keys
-          // « activities:today » est l'ancien journal unique, antérieur au
-          // découpage par jour. Il trie après les clés datées et échapperait à
-          // la comparaison.
-          .filter(
-            (key) =>
-              key.startsWith(KEY_PREFIX) && (key < currentKey || key === LEGACY_KEY),
-          )
-          .map((key) => dbDelete(key)),
-      ),
-    )
-    .then(() => undefined)
-    .catch((purgeError) => console.error('[activities] purge impossible', purgeError))
 }
 
 interface StoredDay {
@@ -87,7 +64,6 @@ export function useActivities(
         })
       })
       .catch((error) => console.error('[activities] lecture impossible', error))
-      .then(() => purgeOldDays(key))
       .finally(() => {
         if (!cancelled) setLoaded(true)
       })
