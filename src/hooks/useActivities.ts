@@ -32,16 +32,20 @@ export function useActivities(
 ): UseActivitiesResult {
   const [stored, setStored] = useState<StoredDay | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [shownDay, setShownDay] = useState(day)
   const key = `${KEY_PREFIX}${day}`
+
+  // Le jour a changé : la remise à zéro se fait pendant le rendu, pas dans
+  // l'effet. Différée d'une frame, une écriture partie entre-temps porterait
+  // la journée précédente sous la clé du nouveau jour.
+  if (shownDay !== day) {
+    setShownDay(day)
+    setStored(null)
+    setLoaded(false)
+  }
 
   useEffect(() => {
     let cancelled = false
-    // Le jour a changé : sans cette remise à zéro, la journée précédente
-    // resterait affichée pendant la lecture de la nouvelle. C'est bien un
-    // effet, la valeur venant d'une lecture asynchrone du magasin.
-    // oxlint-disable-next-line react/set-state-in-effect
-    setStored(null)
-    setLoaded(false)
     dbGet<StoredDay>(key)
       .then((existing) => {
         if (cancelled) return
@@ -94,7 +98,7 @@ export function useActivities(
     : []
   const dismissed = ready ? (stored?.dismissedPlannedIds ?? []) : []
 
-  const planned = plannedActivitiesFor(dateOfKey(day), schedule)
+  const planned = (ready ? plannedActivitiesFor(dateOfKey(day), schedule) : [])
     .filter(
       (activity) =>
         !dismissed.includes(activity.id) && !saved.some((entry) => entry.id === activity.id),
