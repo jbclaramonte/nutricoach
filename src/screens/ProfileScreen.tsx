@@ -1,8 +1,10 @@
 import { Icon } from '../components/Icon'
 import { ChipInput } from '../components/profile/ChipInput'
 import { NumberField } from '../components/profile/NumberField'
+import { ScheduleSection } from '../components/profile/ScheduleSection'
 import { SectionCard } from '../components/profile/SectionCard'
 import type { UseProfileResult } from '../hooks/useProfile'
+import type { UseScheduleResult } from '../hooks/useSchedule'
 import {
   ACTIVITY_LEVELS,
   GOALS,
@@ -18,9 +20,12 @@ interface ProfileScreenProps {
   // Les états vivent dans App : une seconde instance de ces hooks ne verrait
   // pas ce qui est enregistré ici.
   profileStore: UseProfileResult
+  scheduleStore: UseScheduleResult
+  /** false tant que la clé et le modèle ne sont pas renseignés. */
+  configured: boolean
 }
 
-export function ProfileScreen({ profileStore }: ProfileScreenProps) {
+export function ProfileScreen({ profileStore, scheduleStore, configured }: ProfileScreenProps) {
   const { profile, loaded, saveState, update, save } = profileStore
   const bmi = computeBmi(profile.heightCm, profile.weightKg)
 
@@ -308,6 +313,8 @@ export function ProfileScreen({ profileStore }: ProfileScreenProps) {
           </span>
         </div>
       </SectionCard>
+
+      <ScheduleSection configured={configured} notes={profile.notes} scheduleStore={scheduleStore} />
 
       <div className="flex items-start gap-sm rounded-xl bg-primary/10 p-md">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary">

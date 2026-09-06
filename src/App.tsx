@@ -12,6 +12,7 @@ import { useHashRoute } from './hooks/useHashRoute'
 import { useModelCatalog } from './hooks/useModelCatalog'
 import { useOnline } from './hooks/useOnline'
 import { useProfile } from './hooks/useProfile'
+import { useSchedule } from './hooks/useSchedule'
 import { isConfigured } from './lib/ai/settings'
 import { DashboardScreen } from './screens/DashboardScreen'
 import { PlaceholderScreen } from './screens/PlaceholderScreen'
@@ -30,13 +31,16 @@ export default function App() {
   // L'état partagé vit ici : le dashboard et le coach doivent voir le même
   // menu, sans quoi une génération resterait invisible du chat jusqu'au
   // prochain chargement.
-  const activityStore = useActivities()
   const profileStore = useProfile()
   const aiSettings = useAiSettings()
   const modelCatalog = useModelCatalog()
   const { profile } = profileStore
   const { settings } = aiSettings
   const { models } = modelCatalog
+  const scheduleStore = useSchedule(settings, models)
+  // Le planning alimente la journée : les habitudes du jour sont proposées
+  // dans la chronologie, à confirmer une par une.
+  const activityStore = useActivities(scheduleStore.schedule, scheduleStore.loaded)
   const dailyMenu = useDailyMenu(
     settings,
     profile,
@@ -72,7 +76,7 @@ export default function App() {
         {isSettings ? (
           <SettingsScreen aiSettings={aiSettings} modelCatalog={modelCatalog} />
         ) : route === 'profil' ? (
-          <ProfileScreen profileStore={profileStore} />
+          <ProfileScreen configured={configured} profileStore={profileStore} scheduleStore={scheduleStore} />
         ) : route === 'progress' ? (
           <PlaceholderScreen
             description="Le suivi du poids et des tendances de macros arrivera ici."

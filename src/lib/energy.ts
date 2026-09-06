@@ -23,11 +23,20 @@ export function basalMetabolicRate(profile: Profile): number {
  */
 export function dailyTarget(profile: Profile, activities: Activity[]): number {
   const maintenance = basalMetabolicRate(profile) * ACTIVITY_FACTORS[profile.activityLevel]
-  const burned = activities.reduce(
-    (total, activity) =>
-      total + estimateCalories(findActivityType(activity.typeId).met, profile.weightKg, activity.durationMin),
-    0,
-  )
+  // Une activité seulement proposée par le planning n'a pas été faite : la
+  // compter gonflerait la cible d'une dépense qui n'a peut-être pas eu lieu.
+  const burned = activities
+    .filter((activity) => !activity.planned)
+    .reduce(
+      (total, activity) =>
+        total +
+        estimateCalories(
+          findActivityType(activity.typeId).met,
+          profile.weightKg,
+          activity.durationMin,
+        ),
+      0,
+    )
 
   const fatLoss = profile.goals.includes('fat-loss')
   const muscle = profile.goals.includes('muscle')

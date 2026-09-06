@@ -1,7 +1,7 @@
 import type { Profile } from '../profile'
 import { ACTIVITY_LEVELS, HEALTH_TAGS, computeBmi, describeGoals } from '../profile'
 import type { Activity } from '../activities'
-import { estimateCalories, findActivityType, intensityLabel } from '../activities'
+import { ACTIVITY_TYPES, estimateCalories, findActivityType, intensityLabel } from '../activities'
 import { dailyTarget } from '../energy'
 import type { GeneratedMenu } from './menuSchema'
 
@@ -116,16 +116,27 @@ export function buildCoachSystemPrompt(
     blocks.push(['GOÛTS', ...tastes].join('\n'))
   }
 
-  const day = activities.map((activity) => {
+  const describeActivity = (activity: Activity) => {
     const type = findActivityType(activity.typeId)
     const kcal = estimateCalories(type.met, profile.weightKg, activity.durationMin)
     const title = activity.title || type.label
     return `${activity.time} — ${title} (${type.category}), ${activity.durationMin} min, intensité ${intensityLabel(type.met)}, ~${kcal} kcal`
-  })
+  }
+
+  const day = activities.filter((activity) => !activity.planned).map(describeActivity)
+  // Les activités seulement prévues sont annoncées à part : la cible du jour ne
+  // compte pas encore leur dépense, mais les repas peuvent être placés autour.
+  const expected = activities.filter((activity) => activity.planned).map(describeActivity)
   blocks.push(
     [
       'LA JOURNÉE',
-      day.length > 0 ? bulletList(day) : 'Aucune activité saisie aujourd’hui.',
+      day.length > 0 ? bulletList(day) : 'Aucune activité faite ou confirmée aujourd’hui.',
+      ...(expected.length > 0
+        ? [
+            'Activités prévues mais pas encore confirmées (leurs calories ne sont pas comptées dans la cible) :',
+            bulletList(expected),
+          ]
+        : []),
       'Place et calibre les repas autour de ces séances.',
     ].join('\n'),
   )
@@ -191,6 +202,37 @@ export function buildRevisionRequest(
 
   if (!hasStructuredOutputs) {
     lines.push('', ...RAW_JSON_INSTRUCTION)
+  }
+
+  return lines.join('\n')
+}
+
+/** Forme attendue pour l'extraction, rappelée aux modèles sans schéma strict. */
+const RAW_SCHEDULE_INSTRUCTION = [
+  'Réponds uniquement par un objet JSON brut, sans texte autour, sans bloc de code, à cette forme exacte :',
+  '{"activities":[{"weekdays":[2,3,4],"typeId":"bike","title":"Trajet bureau","time":"08:00","durationMin":0,"distanceKm":18}]}',
+]
+
+/**
+ * Tour utilisateur demandant d'extraire les habitudes de la semaine du texte
+ * libre du profil. Rien n'est appliqué automatiquement : l'utilisateur valide.
+ */
+export function buildScheduleRequest(notes: string, hasStructuredOutputs: boolean): string {
+  const lines = [
+    "Voici les précisions libres de l'utilisateur :",
+    notes.trim(),
+    '',
+    'Extrais UNIQUEMENT les activités physiques récurrentes explicitement énoncées dans ce texte.',
+    "N'invente rien : aucune activité qui ne soit pas mentionnée, aucun jour qui ne soit pas mentionné.",
+    "Si le texte ne dit rien d'une activité physique, renvoie une liste vide.",
+    `Types disponibles : ${ACTIVITY_TYPES.map((type) => `${type.id} (${type.label})`).join(', ')}.`,
+    'Les jours sont des entiers : 1 = lundi, 7 = dimanche.',
+    'Pour chaque activité, donne soit une durée en minutes, soit une distance en kilomètres ; mets 0 pour celle qui est inconnue.',
+    "Un aller-retour quotidien compte pour la distance totale de la journée s'il est décrit ainsi.",
+  ]
+
+  if (!hasStructuredOutputs) {
+    lines.push('', ...RAW_SCHEDULE_INSTRUCTION)
   }
 
   return lines.join('\n')

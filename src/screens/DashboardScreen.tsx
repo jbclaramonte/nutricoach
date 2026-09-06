@@ -27,7 +27,7 @@ export function DashboardScreen({
   dailyMenu,
   configured,
 }: DashboardScreenProps) {
-  const { activities, add, remove } = activityStore
+  const { activities, add, remove, confirm } = activityStore
   const { menu, meals, state, error, dropped, generate, toggleEaten } = dailyMenu
   const [adding, setAdding] = useState(false)
 
@@ -115,6 +115,7 @@ export function DashboardScreen({
             <ActivityCard
               activity={entry.activity}
               key={entry.activity.id}
+              onConfirm={confirm}
               onRemove={remove}
               weightKg={profile.weightKg}
             />

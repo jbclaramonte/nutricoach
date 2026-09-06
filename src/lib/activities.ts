@@ -28,6 +28,8 @@ export interface Activity {
   durationMin: number
   /** Note d'impact sur le repas suivant, rédigée par le coach. */
   impact?: string
+  /** Proposée par le planning hebdomadaire, pas encore confirmée. */
+  planned?: boolean
 }
 
 /**
