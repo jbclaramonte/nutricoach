@@ -94,6 +94,17 @@ export function buildCoachSystemPrompt(
     blocks.push(['CONTRAINTES SANTÉ', bulletList(rules)].join('\n'))
   }
 
+  const notes = profile.notes.trim()
+  if (notes) {
+    blocks.push(
+      [
+        "PRÉCISIONS DE L'UTILISATEUR",
+        'Ces précisions orientent la composition des repas, mais ne remplacent jamais les allergies et les contraintes santé ci-dessus, qui restent prioritaires.',
+        notes,
+      ].join('\n'),
+    )
+  }
+
   const tastes: string[] = []
   if (profile.favorites.length > 0) {
     tastes.push(`À privilégier quand c'est cohérent avec la cible : ${profile.favorites.join(', ')}.`)

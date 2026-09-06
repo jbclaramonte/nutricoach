@@ -7,6 +7,7 @@ import {
   ACTIVITY_LEVELS,
   GOALS,
   HEALTH_TAGS,
+  NOTES_MAX_LENGTH,
   computeBmi,
   describeGoals,
   toggle,
@@ -282,6 +283,29 @@ export function ProfileScreen({ profileStore }: ProfileScreenProps) {
             placeholder="Ajouter un aliment à écarter..."
             values={profile.dislikes}
           />
+        </div>
+      </SectionCard>
+
+      <SectionCard icon="edit_note" title="Précisions libres">
+        <textarea
+          className="w-full resize-y rounded-lg bg-surface-container-low p-sm font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none"
+          maxLength={NOTES_MAX_LENGTH}
+          onChange={(event) => update({ notes: event.target.value })}
+          placeholder="Ex : je vais au travail en vélo le mardi, mercredi et jeudi (18 km), télétravail le lundi et vendredi. Salle de sport le mardi matin, 30 minutes."
+          rows={5}
+          value={profile.notes}
+        />
+        <div className="flex items-start justify-between gap-sm">
+          <p className="font-caption text-caption text-on-surface-variant">
+            Ce texte est transmis tel quel au coach, en plus de votre profil.
+          </p>
+          <span
+            className={`shrink-0 font-caption text-caption ${
+              profile.notes.length >= NOTES_MAX_LENGTH ? 'text-error' : 'text-on-surface-variant'
+            }`}
+          >
+            {profile.notes.length} / {NOTES_MAX_LENGTH}
+          </span>
         </div>
       </SectionCard>
 

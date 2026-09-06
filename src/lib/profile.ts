@@ -15,7 +15,15 @@ export interface Profile {
   allergies: string[]
   favorites: string[]
   dislikes: string[]
+  /** Précisions libres, reprises telles quelles dans le prompt du coach. */
+  notes: string
 }
+
+/**
+ * Ce texte part dans chaque appel au modèle : sans plafond, un champ libre
+ * gonflerait silencieusement le coût de toutes les requêtes.
+ */
+export const NOTES_MAX_LENGTH = 1500
 
 export const ACTIVITY_LEVELS: { id: ActivityLevel; label: string; icon: string }[] = [
   { id: 'sedentary', label: 'Sédentaire', icon: 'chair' },
@@ -51,6 +59,7 @@ export const DEFAULT_PROFILE: Profile = {
   allergies: ['Arachides', 'Gluten / Maladie cœliaque', 'Crustacés'],
   favorites: ['Saumon', 'Avocat', 'Lentilles corail', "Flocons d'avoine", 'Baies & myrtilles', 'Épinards'],
   dislikes: ['Coriandre', 'Céleri branche', 'Poivron cuit', 'Choux de Bruxelles'],
+  notes: '',
 }
 
 export interface BmiReading {
