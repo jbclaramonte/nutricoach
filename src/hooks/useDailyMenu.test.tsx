@@ -128,4 +128,57 @@ describe('useDailyMenu', () => {
     })
     expect(set).not.toHaveBeenCalled()
   })
+  it("n'affiche pas une génération revenue après un changement de jour", async () => {
+    // La réponse du modèle est retenue : c'est la fenêtre où le menu de demain
+    // reviendrait sur la journée d'aujourd'hui, puis s'écrirait sous sa clé.
+    let answer!: (raw: string) => void
+    ask.mockImplementation(() => new Promise<string>((resolve) => (answer = resolve)))
+    const { result, rerender } = renderHook(
+      ({ day }) => useDailyMenu(settings, profile, true, [], [], day, true),
+      { initialProps: { day: tomorrow } },
+    )
+    await waitFor(() => expect(get).toHaveBeenCalled())
+    act(() => {
+      result.current.generate()
+    })
+    await waitFor(() => expect(ask).toHaveBeenCalled())
+
+    rerender({ day: todayKey() })
+    await act(async () => {
+      answer(JSON.stringify(storedMenu('Menu de DEMAIN').menu))
+    })
+
+    expect(result.current.menu).toBeNull()
+    expect(result.current.state).toBe('idle')
+    expect(set).not.toHaveBeenCalled()
+  })
+
+  it("n'affiche pas une révision revenue après un changement de jour", async () => {
+    get.mockImplementation((key: string) =>
+      key === `menu:${tomorrow}` ? Promise.resolve(storedMenu('Menu de DEMAIN')) : Promise.resolve(undefined),
+    )
+    let answer!: (raw: string) => void
+    ask.mockImplementation(() => new Promise<string>((resolve) => (answer = resolve)))
+    const { result, rerender } = renderHook(
+      ({ day }) => useDailyMenu(settings, profile, true, [], [], day, true),
+      { initialProps: { day: tomorrow } },
+    )
+    await waitFor(() => expect(result.current.menu).not.toBeNull())
+    let revision!: Promise<void>
+    act(() => {
+      revision = result.current.revise('plus de légumes')
+    })
+    await waitFor(() => expect(ask).toHaveBeenCalled())
+
+    rerender({ day: todayKey() })
+    await act(async () => {
+      answer(JSON.stringify(storedMenu('Menu RÉVISÉ de demain').menu))
+      await revision
+    })
+
+    expect(result.current.menu).toBeNull()
+    expect(result.current.reviseNotice).toBe('')
+    expect(result.current.reviseState).toBe('idle')
+    expect(set).not.toHaveBeenCalled()
+  })
 })
