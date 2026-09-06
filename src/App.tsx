@@ -5,6 +5,7 @@ import { ChatBar } from './components/ChatBar'
 import { CoachSheet } from './components/chat/CoachSheet'
 import { dashboardData } from './data/dashboard'
 import { NAV_ITEMS } from './lib/navigation'
+import { todayKey } from './lib/day'
 import { purgeExpired } from './lib/retention'
 import { useActivities } from './hooks/useActivities'
 import { useAiSettings } from './hooks/useAiSettings'
@@ -48,7 +49,7 @@ export default function App() {
   const scheduleStore = useSchedule(settings, models)
   // Le planning alimente la journée : les habitudes du jour sont proposées
   // dans la chronologie, à confirmer une par une.
-  const activityStore = useActivities(scheduleStore.schedule, scheduleStore.loaded)
+  const activityStore = useActivities(scheduleStore.schedule, scheduleStore.loaded, todayKey(), true)
   const dailyMenu = useDailyMenu(
     settings,
     profile,
