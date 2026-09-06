@@ -16,6 +16,8 @@ export interface RecurringActivity {
   distanceKm?: number
   /** L'heure n'était pas dans le texte : elle a été supposée, à corriger. */
   timeAssumed?: boolean
+  /** La durée non plus : supposée d'après le type d'activité, à corriger. */
+  durationAssumed?: boolean
 }
 
 /** Libellés courts indexés par jour ISO ; l'entrée 0 n'est jamais utilisée. */
@@ -105,4 +107,17 @@ export function mergeRecurring(activities: RecurringActivity[]): RecurringActivi
   }
 
   return merged
+}
+
+/**
+ * Durée de repli quand le texte ne donne ni durée ni distance. « Je vais au
+ * travail en vélo le mardi » est une habitude parfaitement exploitable : la
+ * rejeter faute de chiffre serait absurde. La valeur est signalée comme
+ * supposée, et c'est elle qui alimente le calcul MET tant qu'elle n'est pas
+ * corrigée.
+ */
+export function assumedDurationFor(typeId: string): number {
+  if (typeId === 'run') return 40
+  if (typeId === 'swim' || typeId === 'gym') return 45
+  return 30
 }

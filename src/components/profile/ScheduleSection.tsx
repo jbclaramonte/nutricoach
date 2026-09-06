@@ -31,6 +31,12 @@ interface DurationFieldProps {
   onCommit: (activityId: string, patch: Partial<RecurringActivity>) => void
 }
 
+/** Nomme ce qui a été supposé faute d'information dans le texte. */
+function assumedLabel(activity: RecurringActivity): string {
+  if (activity.timeAssumed && activity.durationAssumed) return 'heure et durée supposées'
+  return activity.timeAssumed ? 'heure supposée' : 'durée supposée'
+}
+
 /**
  * La saisie vit en local le temps de la frappe : borner à chaque touche
  * empêcherait de vider le champ pour retaper une durée.
@@ -40,7 +46,14 @@ function DurationField({ activity, onCommit }: DurationFieldProps) {
 
   return (
     <label className="flex flex-col gap-xs">
-      <span className="font-caption text-caption text-on-surface-variant">Durée (min)</span>
+      <span className="font-caption text-caption text-on-surface-variant">
+        Durée (min)
+        {activity.durationAssumed && (
+          <span className="ml-xs text-tertiary" title="Durée supposée, à vérifier">
+            • supposée
+          </span>
+        )}
+      </span>
       <input
         className={FIELD_CLASS}
         max={600}
@@ -48,7 +61,7 @@ function DurationField({ activity, onCommit }: DurationFieldProps) {
         onBlur={() => {
           const durationMin = Math.max(1, Math.round(Number(draft)) || 1)
           setDraft(`${durationMin}`)
-          onCommit(activity.id, { durationMin })
+          onCommit(activity.id, { durationMin, durationAssumed: false })
         }}
         onChange={(event) => setDraft(event.target.value)}
         type="number"
@@ -235,6 +248,12 @@ export function ScheduleSection({ scheduleStore, notes, configured }: ScheduleSe
             {proposal.map((activity) => (
               <li className="font-body-md text-caption text-on-surface" key={activity.id}>
                 {describe(activity)}
+                {(activity.timeAssumed || activity.durationAssumed) && (
+                  <span className="text-tertiary">
+                    {' '}
+                    — {assumedLabel(activity)} à vérifier
+                  </span>
+                )}
               </li>
             ))}
           </ul>

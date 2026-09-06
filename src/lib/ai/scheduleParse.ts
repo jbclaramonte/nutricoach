@@ -1,10 +1,5 @@
 import { ACTIVITY_TYPES } from '../activities'
-import {
-  assumedTimeFor,
-  durationFromDistance,
-  mergeRecurring,
-  type RecurringActivity,
-} from '../schedule'
+import { assumedDurationFor, assumedTimeFor, durationFromDistance, mergeRecurring, type RecurringActivity } from '../schedule'
 
 export type ScheduleParseResult =
   | { ok: true; activities: RecurringActivity[]; dropped: string[] }
@@ -74,10 +69,11 @@ function parseRecurring(value: unknown): RecurringActivity | null {
   // La distance ne sert qu'à combler une durée manquante : c'est la durée qui
   // alimente ensuite le calcul MET. L'arrondi précède le rejet, sinon une durée
   // déduite d'une distance minime serait enregistrée à 0 min.
-  const durationMin = Math.round(
+  const declaredDuration = Math.round(
     positive(value.durationMin) || durationFromDistance(typeId, distanceKm),
   )
-  if (durationMin <= 0) return null
+  const durationAssumed = declaredDuration <= 0
+  const durationMin = durationAssumed ? assumedDurationFor(typeId) : declaredDuration
 
   const title = text(value.title).trim()
 
@@ -89,6 +85,7 @@ function parseRecurring(value: unknown): RecurringActivity | null {
     time,
     durationMin,
     ...(timeAssumed ? { timeAssumed: true } : {}),
+    ...(durationAssumed ? { durationAssumed: true } : {}),
     ...(distanceKm > 0 ? { distanceKm } : {}),
   }
 }

@@ -230,6 +230,7 @@ export function buildScheduleRequest(notes: string, hasStructuredOutputs: boolea
     "Une seule entrée par activité distincte : liste TOUS ses jours dans `weekdays`. Ne répète jamais la même activité une fois par jour.",
     'Pour chaque activité, donne soit une durée en minutes, soit une distance en kilomètres ; mets 0 pour celle qui est inconnue.',
     "Un aller-retour quotidien compte pour la distance totale de la journée s'il est décrit ainsi.",
+    "La durée est souvent absente elle aussi : propose une durée plausible plutôt que 0, et ne rejette jamais une activité au motif que sa durée est inconnue.",
     "L'heure est rarement précisée : si le texte n'en donne pas, propose l'heure la plus plausible (trajet vers le travail le matin, retour en fin de journée, séance de sport matinale tôt). Ne rejette jamais une activité au motif que son heure est inconnue.",
   ]
 
