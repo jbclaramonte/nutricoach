@@ -45,6 +45,16 @@ function Markdown({ text }: { text: string }) {
   )
 }
 
+/** Point de l'indicateur de frappe, décalé pour donner l'onde. */
+function Dot({ delay }: { delay: string }) {
+  return (
+    <span
+      className="h-1.5 w-1.5 animate-bounce rounded-full bg-on-surface-variant"
+      style={{ animationDelay: delay }}
+    />
+  )
+}
+
 interface MessageBubbleProps {
   message: ChatMessage
 }
@@ -68,12 +78,25 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             src={message.attachment.dataUrl}
           />
         )}
-        {message.text &&
-          (isUser ? (
+        {message.text ? (
+          isUser ? (
             <p className="whitespace-pre-wrap">{message.text}</p>
           ) : (
             <Markdown text={message.text} />
-          ))}
+          )
+        ) : (
+          // Un tour du coach encore vide est un tour en cours : les premiers
+          // tokens d'un modèle qui raisonne peuvent tarder, et une bulle vide
+          // passerait pour une panne.
+          !isUser &&
+          !message.failed && (
+            <span aria-label="Le coach rédige sa réponse" className="flex items-center gap-1 py-1" role="status">
+              <Dot delay="0ms" />
+              <Dot delay="150ms" />
+              <Dot delay="300ms" />
+            </span>
+          )
+        )}
       </div>
 
       {(message.interrupted || message.failed) && (
