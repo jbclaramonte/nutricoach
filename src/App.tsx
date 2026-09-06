@@ -66,6 +66,8 @@ export default function App() {
     activityStore.activities,
     dailyMenu.menu,
     models,
+    todayKey(),
+    true,
   )
 
   const configured = isConfigured(settings)
