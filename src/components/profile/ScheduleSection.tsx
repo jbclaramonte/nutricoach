@@ -121,13 +121,22 @@ export function ScheduleSection({ scheduleStore, notes, configured }: ScheduleSe
 
             <div className="grid grid-cols-2 gap-xs">
               <label className="flex flex-col gap-xs">
-                <span className="font-caption text-caption text-on-surface-variant">Heure</span>
+                <span className="font-caption text-caption text-on-surface-variant">
+                  Heure
+                  {activity.timeAssumed && (
+                    <span className="ml-xs text-tertiary" title="Heure supposée, à vérifier">
+                      • supposée
+                    </span>
+                  )}
+                </span>
                 <input
                   className={FIELD_CLASS}
                   // Un champ vidé enregistrerait une heure vide, qui trie en
                   // tête de journée et s'affiche en blanc : on l'ignore.
                   onChange={(event) => {
-                    if (event.target.value) update(activity.id, { time: event.target.value })
+                    if (event.target.value) {
+                      update(activity.id, { time: event.target.value, timeAssumed: false })
+                    }
                   }}
                   type="time"
                   value={activity.time}

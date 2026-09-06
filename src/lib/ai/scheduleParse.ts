@@ -1,5 +1,5 @@
 import { ACTIVITY_TYPES } from '../activities'
-import { durationFromDistance, type RecurringActivity } from '../schedule'
+import { assumedTimeFor, durationFromDistance, type RecurringActivity } from '../schedule'
 
 export type ScheduleParseResult =
   | { ok: true; activities: RecurringActivity[]; dropped: string[] }
@@ -54,8 +54,13 @@ function parseRecurring(value: unknown): RecurringActivity | null {
   const typeId = text(value.typeId)
   if (!ACTIVITY_TYPES.some((type) => type.id === typeId)) return null
 
-  const time = text(value.time)
-  if (!TIME_PATTERN.test(time)) return null
+  // Une heure manquante ne disqualifie pas l'habitude : le texte de
+  // l'utilisateur décrit rarement des horaires, on en suppose une et on le dit.
+  const declaredTime = text(value.time)
+  const timeAssumed = !TIME_PATTERN.test(declaredTime)
+  const time = timeAssumed
+    ? assumedTimeFor(ACTIVITY_TYPES.find((type) => type.id === typeId)?.category ?? '')
+    : declaredTime
 
   const weekdays = parseWeekdays(value.weekdays)
   if (weekdays.length === 0) return null
@@ -78,6 +83,7 @@ function parseRecurring(value: unknown): RecurringActivity | null {
     title,
     time,
     durationMin,
+    ...(timeAssumed ? { timeAssumed: true } : {}),
     ...(distanceKm > 0 ? { distanceKm } : {}),
   }
 }

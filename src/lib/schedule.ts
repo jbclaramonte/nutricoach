@@ -14,6 +14,8 @@ export interface RecurringActivity {
   durationMin: number
   /** Distance déclarée, quand l'habitude se dit en kilomètres. */
   distanceKm?: number
+  /** L'heure n'était pas dans le texte : elle a été supposée, à corriger. */
+  timeAssumed?: boolean
 }
 
 /** Libellés courts indexés par jour ISO ; l'entrée 0 n'est jamais utilisée. */
@@ -53,4 +55,16 @@ export function plannedActivitiesFor(date: Date, schedule: RecurringActivity[]):
       title: entry.title || findActivityType(entry.typeId).label,
       durationMin: entry.durationMin,
     }))
+}
+
+/**
+ * Heure de repli quand le texte n'en donne aucune. Rejeter une habitude parce
+ * que l'utilisateur n'a pas précisé d'heure serait absurde : « je vais au
+ * travail en vélo le mardi » décrit bien une habitude exploitable. La valeur est
+ * signalée comme supposée pour qu'il la corrige.
+ */
+export function assumedTimeFor(category: string): string {
+  if (category === 'Déplacement actif') return '08:00'
+  if (category === 'Récupération') return '19:00'
+  return '18:00'
 }

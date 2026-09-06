@@ -229,6 +229,7 @@ export function buildScheduleRequest(notes: string, hasStructuredOutputs: boolea
     'Les jours sont des entiers : 1 = lundi, 7 = dimanche.',
     'Pour chaque activité, donne soit une durée en minutes, soit une distance en kilomètres ; mets 0 pour celle qui est inconnue.',
     "Un aller-retour quotidien compte pour la distance totale de la journée s'il est décrit ainsi.",
+    "L'heure est rarement précisée : si le texte n'en donne pas, propose l'heure la plus plausible (trajet vers le travail le matin, retour en fin de journée, séance de sport matinale tôt). Ne rejette jamais une activité au motif que son heure est inconnue.",
   ]
 
   if (!hasStructuredOutputs) {
