@@ -1,6 +1,6 @@
 import { OpenRouterError, kindFromStatus } from './errors'
 import { readSseStream } from './sse'
-import type { ORKeyInfo, ORMessage, ORModel } from './types'
+import type { ORKeyInfo, ORMessage, ORModel, StreamResult } from './types'
 
 const BASE_URL = 'https://openrouter.ai/api/v1'
 
@@ -103,10 +103,15 @@ export async function complete(request: CompletionRequest): Promise<string> {
 /**
  * Version incrémentale de complete(). Une interruption volontaire n'est pas une
  * erreur : le texte déjà reçu est renvoyé tel quel.
+ *
+ * `finishReason` vaut null quand le flux s'est fermé sans que le modèle ait
+ * annoncé sa fin — un fournisseur qui coupe la connexion ne produit ni erreur
+ * HTTP ni événement d'erreur, et la réponse tronquée passerait sinon pour
+ * complète.
  */
 export async function streamComplete(
   request: CompletionRequest & { onDelta: (delta: string) => void },
-): Promise<string> {
+): Promise<StreamResult> {
   let response: Response
   try {
     response = await fetch(`${BASE_URL}/chat/completions`, {
@@ -116,20 +121,28 @@ export async function streamComplete(
       signal: request.signal,
     })
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') return ''
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return { text: '', finishReason: 'abort' }
+    }
     wrapNetworkError(error)
   }
   if (!response.ok) throw await toError(response)
   if (!response.body) throw new OpenRouterError('parse', response.status, 'Flux vide')
 
   let text = ''
+  let finishReason: string | null = null
   try {
     await readSseStream(
       response.body,
       (payload) => {
         throwIfStreamError(payload)
-        const delta = (payload as { choices?: { delta?: { content?: string } }[] }).choices?.[0]
-          ?.delta?.content
+        const choice = (
+          payload as {
+            choices?: { delta?: { content?: string }; finish_reason?: string | null }[]
+          }
+        ).choices?.[0]
+        if (choice?.finish_reason) finishReason = choice.finish_reason
+        const delta = choice?.delta?.content
         if (!delta) return
         text += delta
         request.onDelta(delta)
@@ -137,11 +150,13 @@ export async function streamComplete(
       request.signal,
     )
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') return text
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return { text, finishReason: 'abort' }
+    }
     if (error instanceof OpenRouterError) throw error
     throw new OpenRouterError('parse', 0, 'Flux interrompu')
   }
-  return text
+  return { text, finishReason }
 }
 
 interface RawModel {

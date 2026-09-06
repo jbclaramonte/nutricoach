@@ -33,3 +33,15 @@ export interface ORKeyInfo {
   limitRemaining: number | null
   isFreeTier: boolean
 }
+
+/** Résultat d'un tour streamé. */
+export interface StreamResult {
+  text: string
+  /**
+   * Raison de fin annoncée par le modèle : « stop » pour une réponse complète,
+   * « length » si le plafond de jetons a été atteint, « abort » sur
+   * interruption volontaire. null quand le flux s'est fermé sans rien annoncer,
+   * c'est-à-dire une coupure côté fournisseur.
+   */
+  finishReason: string | null
+}

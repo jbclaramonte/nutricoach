@@ -187,9 +187,28 @@ export function useCoachChat(
                 ),
               )
             },
-          }).then(() => {
-            setState('idle')
-            persist(applyMessages((current) => capped(current)))
+          }).then(({ finishReason }) => {
+            // Une fin non annoncée signale une coupure côté fournisseur : la
+            // réponse est incomplète et doit être présentée comme telle plutôt
+            // que de passer pour terminée.
+            const cut = finishReason === null || finishReason === 'length'
+            if (cut) {
+              setError(
+                finishReason === 'length'
+                  ? 'Réponse coupée : la limite de longueur a été atteinte.'
+                  : 'Réponse interrompue par le fournisseur avant la fin. Renvoyez votre question.',
+              )
+            }
+            setState(cut ? 'error' : 'idle')
+            persist(
+              applyMessages((current) =>
+                capped(
+                  current.map((message) =>
+                    cut && message.id === replyId ? { ...message, interrupted: true } : message,
+                  ),
+                ),
+              ),
+            )
           })
         })
         .catch((sendError) => {
