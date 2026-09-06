@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { dayLabel } from '../lib/day'
 import { dbGet, dbSet } from '../lib/db'
 import { fileToDataUrl } from '../lib/ai/images'
 import { buildCoachSystemPrompt } from '../lib/ai/prompts'
@@ -194,7 +195,7 @@ export function useCoachChat(
             apiKey: settings.apiKey.trim(),
             model: settings.modelId,
             messages: toOrMessages(
-              buildCoachSystemPrompt(profile, activities, todaysMenu ?? undefined),
+              buildCoachSystemPrompt(profile, activities, dayLabel(day), todaysMenu ?? undefined),
               [userMessage],
             ),
             temperature: 0.6,

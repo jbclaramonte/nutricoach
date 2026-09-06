@@ -173,7 +173,7 @@ export function useDailyMenu(
     const jsonSchema = model?.supportsStructuredOutputs ? MENU_JSON_SCHEMA : undefined
 
     const messages: ORMessage[] = [
-      { role: 'system', content: buildCoachSystemPrompt(profile, activities) },
+      { role: 'system', content: buildCoachSystemPrompt(profile, activities, dayLabel(day)) },
       { role: 'user', content: buildMenuRequest(dayLabel(day), jsonSchema !== undefined) },
     ]
 
@@ -295,7 +295,7 @@ export function useDailyMenu(
       const remainingKcal = Math.max(0, dailyTarget(profile, activities) - consumedKcal)
 
       const messages: ORMessage[] = [
-        { role: 'system', content: buildCoachSystemPrompt(profile, activities) },
+        { role: 'system', content: buildCoachSystemPrompt(profile, activities, dayLabel(day), current.menu) },
         {
           role: 'user',
           content: buildRevisionRequest(
