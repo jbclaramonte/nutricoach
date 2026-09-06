@@ -1,5 +1,10 @@
 import { ACTIVITY_TYPES } from '../activities'
-import { assumedTimeFor, durationFromDistance, type RecurringActivity } from '../schedule'
+import {
+  assumedTimeFor,
+  durationFromDistance,
+  mergeRecurring,
+  type RecurringActivity,
+} from '../schedule'
 
 export type ScheduleParseResult =
   | { ok: true; activities: RecurringActivity[]; dropped: string[] }
@@ -134,5 +139,7 @@ export function parseSchedule(raw: string): ScheduleParseResult {
 
   if (activities.length === 0) return { ok: false, reason: 'empty' }
 
-  return { ok: true, activities, dropped }
+  // Le modèle produit parfois une entrée par jour : la proposition doit être
+  // déjà regroupée quand l'utilisateur la découvre.
+  return { ok: true, activities: mergeRecurring(activities), dropped }
 }

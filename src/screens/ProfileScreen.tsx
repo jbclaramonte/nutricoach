@@ -38,7 +38,7 @@ export function ProfileScreen({ profileStore, scheduleStore, configured }: Profi
   }
 
   return (
-    <div className="flex w-full flex-col gap-lg px-margin-mobile pb-xl">
+    <div className="flex w-full flex-col gap-lg px-margin-mobile pb-32">
       <header className="flex flex-col gap-xs pt-sm">
         <div className="flex items-center gap-xs text-primary">
           <Icon className="text-body-md" filled name="tune" />

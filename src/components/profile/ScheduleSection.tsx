@@ -3,7 +3,7 @@ import { Icon } from '../Icon'
 import { SectionCard } from './SectionCard'
 import type { UseScheduleResult } from '../../hooks/useSchedule'
 import { ACTIVITY_TYPES, findActivityType } from '../../lib/activities'
-import { WEEKDAY_LABELS, type RecurringActivity } from '../../lib/schedule'
+import { WEEKDAY_LABELS, mergeRecurring, type RecurringActivity } from '../../lib/schedule'
 
 interface ScheduleSectionProps {
   scheduleStore: UseScheduleResult
@@ -71,6 +71,12 @@ export function ScheduleSection({ scheduleStore, notes, configured }: ScheduleSe
   const [proposal, setProposal] = useState<RecurringActivity[] | null>(null)
 
   const canExtract = configured && notes.trim().length > 0 && extractState !== 'extracting'
+
+  // Les habitudes déjà enregistrées peuvent contenir des doublons issus d'une
+  // extraction antérieure. On ne les fusionne pas d'office : ce sont les
+  // données de l'utilisateur, la correction lui revient.
+  const mergedSchedule = mergeRecurring(schedule)
+  const duplicateCount = schedule.length - mergedSchedule.length
 
   function handleExtract() {
     void extract(notes).then((extracted) => {
@@ -175,6 +181,17 @@ export function ScheduleSection({ scheduleStore, notes, configured }: ScheduleSe
           </div>
         ))}
       </div>
+
+      {duplicateCount > 0 && (
+        <button
+          className="flex w-full items-center justify-center gap-xs rounded-lg py-xs font-label-md text-caption text-on-surface-variant"
+          onClick={() => setAll(mergedSchedule)}
+          type="button"
+        >
+          <Icon className="text-body-md" name="merge" />
+          Fusionner les doublons ({duplicateCount})
+        </button>
+      )}
 
       <button
         className="flex w-full items-center justify-center gap-xs rounded-lg bg-surface-container-low py-sm font-label-md text-caption font-semibold text-primary"

@@ -68,3 +68,41 @@ export function assumedTimeFor(category: string): string {
   if (category === 'Récupération') return '19:00'
   return '18:00'
 }
+
+/** Clé d'identité d'une habitude : deux entrées qui la partagent sont la même. */
+function habitKey(entry: RecurringActivity): string {
+  return [
+    entry.typeId,
+    entry.time,
+    entry.durationMin,
+    entry.distanceKm ?? '',
+    entry.title.trim().toLowerCase(),
+  ].join('|')
+}
+
+/**
+ * Regroupe les entrées qui décrivent la même habitude sur des jours différents.
+ * L'extraction produit parfois une entrée par jour — « Vélo 08:00 » répété pour
+ * mardi, mercredi et jeudi — alors qu'il s'agit d'une seule habitude à trois
+ * jours. Le premier identifiant et le premier titre sont conservés, l'ordre
+ * d'apparition aussi.
+ */
+export function mergeRecurring(activities: RecurringActivity[]): RecurringActivity[] {
+  const merged: RecurringActivity[] = []
+  const indexByKey = new Map<string, number>()
+
+  for (const entry of activities) {
+    const key = habitKey(entry)
+    const existing = indexByKey.get(key)
+    if (existing === undefined) {
+      indexByKey.set(key, merged.length)
+      merged.push({ ...entry, weekdays: [...entry.weekdays].sort((a, b) => a - b) })
+      continue
+    }
+    const target = merged[existing]
+    const union = [...new Set([...target.weekdays, ...entry.weekdays])].sort((a, b) => a - b)
+    merged[existing] = { ...target, weekdays: union }
+  }
+
+  return merged
+}

@@ -227,6 +227,7 @@ export function buildScheduleRequest(notes: string, hasStructuredOutputs: boolea
     "Si le texte ne dit rien d'une activité physique, renvoie une liste vide.",
     `Types disponibles : ${ACTIVITY_TYPES.map((type) => `${type.id} (${type.label})`).join(', ')}.`,
     'Les jours sont des entiers : 1 = lundi, 7 = dimanche.',
+    "Une seule entrée par activité distincte : liste TOUS ses jours dans `weekdays`. Ne répète jamais la même activité une fois par jour.",
     'Pour chaque activité, donne soit une durée en minutes, soit une distance en kilomètres ; mets 0 pour celle qui est inconnue.',
     "Un aller-retour quotidien compte pour la distance totale de la journée s'il est décrit ainsi.",
     "L'heure est rarement précisée : si le texte n'en donne pas, propose l'heure la plus plausible (trajet vers le travail le matin, retour en fin de journée, séance de sport matinale tôt). Ne rejette jamais une activité au motif que son heure est inconnue.",
