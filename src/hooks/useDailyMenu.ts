@@ -334,7 +334,11 @@ export function useDailyMenu(
           ...current,
           generatedAt: Date.now(),
           modelId: settings.modelId,
-          menu: guarded,
+          // Une révision change des repas, pas le titre de la journée. Le schéma
+          // impose une bannière, si bien qu'un modèle sans rien à dire en
+          // invente une — « Aucun texte » a réellement été renvoyé. Celle de la
+          // génération initiale fait foi.
+          menu: { ...guarded, banner: current.menu.banner },
         }
         setDropped([
           ...parsed.dropped,

@@ -36,7 +36,7 @@ export function DashboardScreen({
 
   return (
     <div className="flex w-full flex-col gap-lg px-margin-mobile pb-40 pt-sm">
-      {menu && menu.banner && (
+      {menu && menu.banner.trim().length > 0 && (
         <div className="flex items-start gap-sm rounded-xl bg-primary-container p-md text-on-primary-container shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
           <Icon className="mt-[2px]" name="auto_awesome" />
           <p className="font-body-md text-body-md">
