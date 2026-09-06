@@ -79,13 +79,22 @@ export function useCoachChat(
   // sous sa clé.
   if (shownDay !== day) {
     setShownDay(day)
+    // Écriture d'un miroir, idempotente et dérivée de la seule prop `day`, dans
+    // le bloc d'ajustement d'état pendant le rendu : rien n'en dépend à
+    // l'affichage, seuls les appels différés la relisent.
+    // oxlint-disable-next-line react/refs
     dayRef.current = day
     // Le flux en cours est coupé par le nettoyage de l'effet de chargement, un
     // instant plus tard : ce qu'il rapporterait entre-temps est écarté par
     // `stale()`, pas par l'interruption.
     // La conversation du jour précédent ne fait plus autorité : celle du nouveau
-    // jour doit pouvoir être relue du magasin.
+    // jour doit pouvoir être relue du magasin. Même nature que ci-dessus :
+    // valeur constante, réécrite à l'identique si le rendu est rejoué.
+    // oxlint-disable-next-line react/refs
     loaded.current = false
+    // `applyMessages` ne fait que remettre le miroir et l'état à la même valeur
+    // vide : sûr à rejouer, et l'état affiché passe bien par `setMessages`.
+    // oxlint-disable-next-line react/refs
     applyMessages([])
     setState('idle')
     setError('')
@@ -99,7 +108,10 @@ export function useCoachChat(
       })
       .catch((readError) => console.error('[chat] lecture impossible', readError))
       .finally(() => {
-        loaded.current = true
+        // Sans `cancelled`, la lecture du jour quitté relâcherait le verrou
+        // alors que celle du nouveau jour est encore en vol : la première
+        // écriture qui suit remplacerait la conversation enregistrée de ce jour.
+        if (!cancelled) loaded.current = true
       })
     return () => {
       cancelled = true
@@ -241,6 +253,9 @@ export function useCoachChat(
           )
         })
         .finally(() => {
+          // Après un changement de jour, `controller` peut déjà porter le flux
+          // de la nouvelle journée : l'effacer priverait `stop` de sa prise.
+          if (stale()) return
           controller.current = null
         })
     },

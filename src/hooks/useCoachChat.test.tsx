@@ -80,6 +80,33 @@ describe('useCoachChat', () => {
     expect(set).not.toHaveBeenCalled()
   })
 
+  it("ne relâche pas le verrou d'écriture sur la lecture du jour quitté", async () => {
+    // La lecture d'hier se résout après la bascule, celle d'aujourd'hui reste en
+    // vol : c'est la fenêtre où un envoi remplacerait la conversation
+    // enregistrée du jour par son seul tour.
+    let answerYesterday!: (stored: ChatMessage[]) => void
+    get.mockImplementation((key: string) =>
+      key === `chat:${yesterday}`
+        ? new Promise((resolve) => (answerYesterday = resolve))
+        : new Promise(() => {}),
+    )
+    const { result, rerender } = renderHook(
+      ({ day }) => useCoachChat(settings, profile, [], null, [], day, true),
+      { initialProps: { day: yesterday } },
+    )
+    await waitFor(() => expect(get).toHaveBeenCalledWith(`chat:${yesterday}`))
+
+    rerender({ day: todayKey() })
+    await act(async () => {
+      answerYesterday(storedChat("Question d’hier"))
+    })
+
+    await act(async () => {
+      result.current.send('quel déjeuner ?', null)
+    })
+    expect(set).not.toHaveBeenCalled()
+  })
+
   it("n'affiche pas un flux revenu après un changement de jour", async () => {
     // La réponse du modèle est retenue : c'est la fenêtre où la réponse de
     // demain reviendrait sur la journée d'aujourd'hui, puis s'écrirait sous sa clé.
