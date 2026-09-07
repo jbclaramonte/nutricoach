@@ -6,6 +6,7 @@ export type ErrorKind =
   | 'provider'
   | 'offline'
   | 'parse'
+  | 'truncated'
 
 export class OpenRouterError extends Error {
   /** Code HTTP ; 0 lorsque la requête n'a jamais abouti (réseau, hors ligne). */
@@ -40,6 +41,8 @@ const MESSAGES: Record<ErrorKind, string> = {
   provider: 'Le fournisseur du modèle ne répond pas : réessayez ou choisissez un autre modèle.',
   offline: 'Aucune connexion : le coach IA a besoin du réseau pour répondre.',
   parse: "La réponse du modèle est illisible : réessayez, ou changez de modèle.",
+  truncated:
+    "Le modèle a été coupé avant la fin de sa réponse (limite de jetons atteinte) : réessayez, ou choisissez un modèle qui réfléchit moins avant de répondre.",
 }
 
 /**

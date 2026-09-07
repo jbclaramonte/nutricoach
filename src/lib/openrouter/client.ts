@@ -90,11 +90,18 @@ export async function complete(request: CompletionRequest): Promise<string> {
   if (!response.ok) throw await toError(response)
 
   const payload = (await response.json()) as {
-    choices?: { message?: { content?: string } }[]
+    choices?: { message?: { content?: string }; finish_reason?: string | null }[]
   }
   throwIfStreamError(payload)
-  const content = payload.choices?.[0]?.message?.content
-  if (typeof content !== 'string') {
+  const choice = payload.choices?.[0]
+  const content = choice?.message?.content
+  // Un modèle qui réfléchit dépense ses jetons de raisonnement sur le même
+  // budget : coupé à la limite, il renvoie un JSON tronqué, illisible au
+  // parsing. Le dire ici évite d'accuser le modèle de ne pas répondre en JSON.
+  if (choice?.finish_reason === 'length') {
+    throw new OpenRouterError('truncated', response.status, 'Réponse coupée à la limite de jetons')
+  }
+  if (typeof content !== 'string' || content.trim() === '') {
     throw new OpenRouterError('parse', response.status, 'Réponse sans contenu')
   }
   return content

@@ -148,7 +148,6 @@ export default function App() {
 
       {showChat && !isCoach && (
         <ChatBar
-          coachName={dashboardData.coach.name}
           disabled={!configured || !online || past}
           onSend={handleSend}
         />

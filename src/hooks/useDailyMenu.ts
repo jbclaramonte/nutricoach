@@ -205,14 +205,18 @@ export function useDailyMenu(
         messages,
         jsonSchema,
         temperature: 0.4,
-        maxTokens: 2500,
+        maxTokens: 4000,
       })
 
     ask()
       .then(async (raw) => {
         if (stale()) return
         let parsed = parseMenu(raw)
-        if (!parsed.ok) throw new Error(PARSE_MESSAGES[parsed.reason])
+        if (!parsed.ok) {
+          // La réponse brute est la seule trace utile pour comprendre un refus.
+          console.error('[menu] réponse non exploitable', parsed.reason, raw)
+          throw new Error(PARSE_MESSAGES[parsed.reason])
+        }
 
         let violations = findAllergyViolations(parsed.menu, profile.allergies)
         if (violations.length > 0) {
@@ -338,14 +342,18 @@ export function useDailyMenu(
           messages,
           jsonSchema,
           temperature: 0.4,
-          maxTokens: 2500,
+          maxTokens: 4000,
         })
 
       try {
         const raw = await ask()
         if (stale()) return
         let parsed = parseMenu(raw)
-        if (!parsed.ok) throw new Error(PARSE_MESSAGES[parsed.reason])
+        if (!parsed.ok) {
+          // La réponse brute est la seule trace utile pour comprendre un refus.
+          console.error('[menu] réponse non exploitable', parsed.reason, raw)
+          throw new Error(PARSE_MESSAGES[parsed.reason])
+        }
 
         let violations = findAllergyViolations(parsed.menu, profile.allergies)
         if (violations.length > 0) {

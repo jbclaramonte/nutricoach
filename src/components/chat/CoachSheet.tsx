@@ -279,7 +279,7 @@ export function CoachSheet({
           <div ref={bottom} />
         </div>
 
-        <ChatBar coachName={coachName} disabled={!configured || !online || readOnly} onSend={onSend} />
+        <ChatBar disabled={!configured || !online || readOnly} onSend={onSend} />
       </section>
     </div>
   )

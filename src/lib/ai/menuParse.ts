@@ -81,12 +81,30 @@ function describeDropped(value: unknown, index: number): string {
  * Convertit la réponse brute du modèle en menu exploitable. Ne lève jamais :
  * une sortie hors format est une situation nominale, pas un bug.
  */
+/**
+ * Extrait l'objet JSON d'une réponse qui l'entoure de prose : sans schéma
+ * strict, un modèle préfixe volontiers son menu d'une phrase d'introduction.
+ */
+function extractObject(text: string): string | null {
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start === -1 || end <= start) return null
+  return text.slice(start, end + 1)
+}
+
 export function parseMenu(raw: string): MenuParseResult {
+  const cleaned = stripFences(raw)
   let payload: unknown
   try {
-    payload = JSON.parse(stripFences(raw))
+    payload = JSON.parse(cleaned)
   } catch {
-    return { ok: false, reason: 'not-json' }
+    const inner = extractObject(cleaned)
+    if (inner === null) return { ok: false, reason: 'not-json' }
+    try {
+      payload = JSON.parse(inner)
+    } catch {
+      return { ok: false, reason: 'not-json' }
+    }
   }
 
   if (!isRecord(payload) || !Array.isArray(payload.meals)) return { ok: false, reason: 'wrong-shape' }

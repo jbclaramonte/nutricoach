@@ -2,15 +2,13 @@ import { useRef, useState } from 'react'
 import { Icon } from './Icon'
 
 interface ChatBarProps {
-  /** Nom du coach affiché dans le placeholder. */
-  coachName: string
   /** Appelé à l'envoi ; la photo est optionnelle. */
   onSend: (message: string, photo: File | null) => void
   /** Verrouille la saisie tant que le coach IA n'est pas configuré. */
   disabled?: boolean
 }
 
-export function ChatBar({ coachName, onSend, disabled = false }: ChatBarProps) {
+export function ChatBar({ onSend, disabled = false }: ChatBarProps) {
   const [message, setMessage] = useState('')
   const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -75,7 +73,7 @@ export function ChatBar({ coachName, onSend, disabled = false }: ChatBarProps) {
           disabled={disabled}
           onChange={(event) => setMessage(event.target.value)}
           placeholder={
-            disabled ? 'Configurez votre clé OpenRouter dans Profil' : `Message à ${coachName}...`
+            disabled ? 'Configurez votre clé OpenRouter dans Profil' : "Message à l'IA..."
           }
           type="text"
           value={message}
