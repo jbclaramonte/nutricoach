@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import type { FoodItem } from '../types'
 import { Icon } from './Icon'
 
@@ -34,15 +34,44 @@ export function FoodActionSheet({
   onReplace,
 }: FoodActionSheetProps) {
   const first = useRef<HTMLButtonElement>(null)
+  const confirmation = useRef<HTMLParagraphElement>(null)
+  const sheet = useRef<HTMLElement>(null)
+  const titleId = useId()
+
+  // Déclaré avant le déplacement du focus : sinon la feuille se prendrait
+  // elle-même pour point de départ. La ligne d'origine est démontée avec la
+  // feuille : sans cette restitution, la
+  // navigation au clavier repartirait du haut du document.
+  useEffect(() => {
+    const origin = document.activeElement
+    return () => {
+      if (origin instanceof HTMLElement && origin.isConnected) origin.focus()
+    }
+  }, [])
 
   // Sans cela le focus resterait sur la ligne du tableau, derrière le voile.
+  // Le rejet enregistré n'apparaît que dans la confirmation : c'est elle qu'il
+  // faut lire, pas le bouton qui la suit.
   useEffect(() => {
-    first.current?.focus()
+    if (replaceOffered) confirmation.current?.focus()
+    else first.current?.focus()
   }, [replaceOffered])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (event.key !== 'Tab') return
+      // Les commandes restées derrière le voile sont encore focusables : le Tab
+      // tourne donc en boucle dans la feuille plutôt que d'y aboutir.
+      const stops = sheet.current?.querySelectorAll('button')
+      if (!stops || stops.length === 0) return
+      const edge = event.shiftKey ? stops[0] : stops[stops.length - 1]
+      if (document.activeElement !== edge && sheet.current?.contains(document.activeElement)) return
+      event.preventDefault()
+      ;(event.shiftKey ? stops[stops.length - 1] : stops[0]).focus()
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
@@ -79,8 +108,10 @@ export function FoodActionSheet({
       />
 
       <section
-        aria-label={`Actions pour ${food.name}`}
+        aria-labelledby={titleId}
+        aria-modal="true"
         className="absolute bottom-0 left-0 right-0 flex flex-col rounded-t-3xl bg-background pb-md shadow-[0_-8px_32px_rgba(0,0,0,0.18)]"
+        ref={sheet}
         role="dialog"
       >
         <div className="flex shrink-0 flex-col items-center gap-xs pb-xs pt-sm">
@@ -88,7 +119,9 @@ export function FoodActionSheet({
         </div>
 
         <header className="flex flex-col border-b border-surface-container px-margin-mobile pb-sm">
-          <span className="font-headline-md text-body-md text-on-surface">{food.name}</span>
+          <span className="font-headline-md text-body-md text-on-surface" id={titleId}>
+            {food.name}
+          </span>
           <span className="font-caption text-caption text-on-surface-variant">
             {food.quantity} — {mealLabel}
           </span>
@@ -96,13 +129,17 @@ export function FoodActionSheet({
 
         {replaceOffered ? (
           <div className="flex flex-col gap-sm px-margin-mobile pt-md">
-            <p className="font-body-md text-body-md text-on-surface">
+            <p
+              className="font-body-md text-body-md text-on-surface"
+              ref={confirmation}
+              role="status"
+              tabIndex={-1}
+            >
               {food.name} n'apparaîtra plus dans vos menus.
             </p>
             <button
               className="flex items-center justify-center gap-xs rounded-full bg-primary px-md py-sm font-label-md text-body-md text-on-primary transition-colors active:opacity-80"
               onClick={onReplace}
-              ref={first}
               type="button"
             >
               <Icon className="text-body-md" name="restaurant_menu" />

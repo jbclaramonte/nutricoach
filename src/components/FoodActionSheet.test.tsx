@@ -51,6 +51,50 @@ describe('FoodActionSheet', () => {
     expect(props.onMissing).toHaveBeenCalledOnce()
   })
 
+  it('emmène la lecture sur la confirmation du rejet', () => {
+    renderSheet({ replaceOffered: true })
+
+    const confirmation = screen.getByText("Quinoa n'apparaîtra plus dans vos menus.")
+    expect(confirmation.getAttribute('role')).toBe('status')
+    expect(document.activeElement).toBe(confirmation)
+  })
+
+  it('retient le Tab dans la feuille', () => {
+    renderSheet()
+
+    const buttons = screen.getByRole('dialog').querySelectorAll('button')
+    const last = buttons[buttons.length - 1]
+    last.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(buttons[0])
+
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(last)
+  })
+
+  it("rend le focus à son point de départ", () => {
+    const origin = document.createElement('button')
+    document.body.append(origin)
+    origin.focus()
+
+    const { unmount } = render(
+      <FoodActionSheet
+        food={food}
+        mealLabel="Déjeuner"
+        onClose={vi.fn()}
+        onDislike={vi.fn()}
+        onLike={vi.fn()}
+        onMissing={vi.fn()}
+        onReplace={vi.fn()}
+        replaceOffered={false}
+      />,
+    )
+    unmount()
+
+    expect(document.activeElement).toBe(origin)
+    origin.remove()
+  })
+
   it('propose le remplacement après un rejet', () => {
     const props = renderSheet({ replaceOffered: true })
 
@@ -65,6 +109,7 @@ describe('FoodActionSheet', () => {
     renderSheet()
 
     expect(document.activeElement).toBe(screen.getByText("J'aime").closest('button'))
+    expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true')
   })
 
   it('ferme au voile et à la touche Échap', () => {

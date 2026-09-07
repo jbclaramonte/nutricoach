@@ -103,7 +103,7 @@ export function MealCard({
                       // défile encore horizontalement sans que rien ne l'intercepte.
                       <button
                         aria-label={`Actions pour ${item.name}`}
-                        className="w-full text-left underline decoration-outline-variant decoration-dotted underline-offset-4"
+                        className="flex min-h-11 w-full items-center text-left underline decoration-outline-variant decoration-dotted underline-offset-4"
                         onClick={() => onPickFood(item)}
                         type="button"
                       >
