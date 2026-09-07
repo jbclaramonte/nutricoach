@@ -7,21 +7,20 @@ interface MealCardProps {
   onToggleEaten: (mealId: string) => void
   /** Ouvre les actions de l'aliment touché. */
   onPickFood: (item: FoodItem) => void
-  /** Vrai hors du jour même : le repas se lit, la coche n'a pas de sens. */
-  readOnly?: boolean
-  /** Vrai pendant une révision du menu : un second geste porterait sur un menu périmé. */
-  busy?: boolean
+  /** Gouverne la coche « repas pris » : elle n'a de sens que le jour vécu. */
+  canCheckEaten?: boolean
+  /** Gouverne les boutons d'aliment : ils suivent la règle de la révision. */
+  canPickFood?: boolean
 }
 
 export function MealCard({
   meal,
   onToggleEaten,
   onPickFood,
-  readOnly = false,
-  busy = false,
+  canCheckEaten = true,
+  canPickFood = true,
 }: MealCardProps) {
   const totals = sumMeal(meal.items)
-  const actionable = !readOnly && !busy
 
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
@@ -59,7 +58,7 @@ export function MealCard({
               </p>
             )}
           </div>
-          {!readOnly && (
+          {canCheckEaten && (
             <button
               aria-label={
                 meal.eaten
@@ -98,7 +97,7 @@ export function MealCard({
               {meal.items.map((item) => (
                 <tr className="border-b border-outline-variant/30" key={item.name}>
                   <td className="py-xs pr-xs">
-                    {actionable ? (
+                    {canPickFood ? (
                       // Le geste reste un simple appui sur un bouton : le tableau
                       // défile encore horizontalement sans que rien ne l'intercepte.
                       <button

@@ -30,16 +30,21 @@ describe('MealCard', () => {
     expect(onPickFood).toHaveBeenCalledWith(meal.items[1])
   })
 
-  it("n'offre aucune action sur un jour passé", () => {
-    render(<MealCard meal={meal} onPickFood={vi.fn()} onToggleEaten={vi.fn()} readOnly />)
+  it("n'offre aucune action d'aliment quand elles sont fermées", () => {
+    render(
+      <MealCard canPickFood={false} meal={meal} onPickFood={vi.fn()} onToggleEaten={vi.fn()} />,
+    )
 
     expect(screen.queryByLabelText('Actions pour Poulet')).toBeNull()
     expect(screen.getByText('Poulet')).toBeTruthy()
   })
 
-  it("n'offre aucune action pendant une révision", () => {
-    render(<MealCard busy meal={meal} onPickFood={vi.fn()} onToggleEaten={vi.fn()} />)
+  it('sépare la coche des actions d\'aliment', () => {
+    render(
+      <MealCard canCheckEaten={false} meal={meal} onPickFood={vi.fn()} onToggleEaten={vi.fn()} />,
+    )
 
-    expect(screen.queryByLabelText('Actions pour Poulet')).toBeNull()
+    expect(screen.queryByLabelText(/Marquer Déjeuner comme/)).toBeNull()
+    expect(screen.getByLabelText('Actions pour Poulet')).toBeTruthy()
   })
 })

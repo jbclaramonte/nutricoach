@@ -41,8 +41,15 @@ const activities: UseActivitiesResult = {
 const addTaste = vi.fn()
 const revise = vi.fn()
 
+/** État de révision du menu, à part : la plupart des tests le laissent au repos. */
+interface Revision {
+  revising?: boolean
+  reviseError?: string
+  reviseNotice?: string
+}
+
 /** Menu du jour au repos ; `meals` vide fait apparaître la carte de génération. */
-function menuStore(meals: Meal[], error = '', revising = false): UseDailyMenuResult {
+function menuStore(meals: Meal[], error = '', revision: Revision = {}): UseDailyMenuResult {
   return {
     menu: null,
     meals,
@@ -53,19 +60,19 @@ function menuStore(meals: Meal[], error = '', revising = false): UseDailyMenuRes
     generate: vi.fn(),
     toggleEaten: vi.fn(),
     revise,
-    reviseState: revising ? 'revising' : 'idle',
-    reviseError: '',
-    reviseNotice: '',
+    reviseState: revision.revising ? 'revising' : 'idle',
+    reviseError: revision.reviseError ?? '',
+    reviseNotice: revision.reviseNotice ?? '',
   }
 }
 
-function screenOf(day: string, meals: Meal[] = [meal], error = '', revising = false) {
+function screenOf(day: string, meals: Meal[] = [meal], error = '', revision: Revision = {}) {
   return (
     <DashboardScreen
       activities={activities}
       addTaste={addTaste}
       configured
-      dailyMenu={menuStore(meals, error, revising)}
+      dailyMenu={menuStore(meals, error, revision)}
       day={day}
       onDayChange={vi.fn()}
       profile={DEFAULT_PROFILE}
@@ -74,8 +81,8 @@ function screenOf(day: string, meals: Meal[] = [meal], error = '', revising = fa
   )
 }
 
-function renderDay(day: string, meals: Meal[] = [meal], error = '', revising = false) {
-  render(screenOf(day, meals, error, revising))
+function renderDay(day: string, meals: Meal[] = [meal], error = '', revision: Revision = {}) {
+  render(screenOf(day, meals, error, revision))
 }
 
 /** Ouvre la feuille d'actions sur le saumon du déjeuner. */
@@ -209,11 +216,42 @@ describe('DashboardScreen', () => {
   })
 
   it("n'ouvre la feuille ni pendant une révision ni sur un jour passé", () => {
-    renderDay(todayKey(), [meal], '', true)
+    renderDay(todayKey(), [meal], '', { revising: true })
     expect(screen.queryByLabelText('Actions pour Saumon')).toBeNull()
 
     cleanup()
     renderDay(yesterday)
     expect(screen.queryByLabelText('Actions pour Saumon')).toBeNull()
+  })
+
+  it("offre les actions d'aliment sur demain, sans la coche", () => {
+    renderDay(tomorrow)
+    fireEvent.click(screen.getByLabelText('Actions pour Saumon'))
+    fireEvent.click(screen.getByText("Je n'en ai pas"))
+
+    expect(revise).toHaveBeenCalledWith(
+      "Je n'ai pas de Saumon pour le Déjeuner. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.",
+    )
+    expect(screen.queryByLabelText(/Marquer Déjeuner comme/)).toBeNull()
+  })
+
+  it("nettoie le nom de l'aliment dans la demande", () => {
+    const spaced: Meal = { ...meal, items: [{ ...meal.items[0], name: '  Saumon  ' }] }
+    renderDay(todayKey(), [spaced])
+    fireEvent.click(screen.getByLabelText(/Actions pour/))
+    fireEvent.click(screen.getByText("Je n'en ai pas"))
+
+    expect(revise).toHaveBeenCalledWith(
+      "Je n'ai pas de Saumon pour le Déjeuner. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.",
+    )
+  })
+
+  it("affiche le résultat et l'erreur d'une révision", () => {
+    renderDay(todayKey(), [meal], '', { reviseNotice: 'Déjeuner remplacé.' })
+    expect(screen.getByText('Déjeuner remplacé.')).toBeTruthy()
+
+    cleanup()
+    renderDay(todayKey(), [meal], '', { reviseError: 'Le modèle n\'a pas répondu.' })
+    expect(screen.getByText("Le modèle n'a pas répondu.")).toBeTruthy()
   })
 })

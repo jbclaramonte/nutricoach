@@ -73,6 +73,9 @@ export function DashboardScreen({
   // Une révision en cours réécrit le menu : agir sur l'aliment affiché
   // porterait sur un repas déjà remplacé.
   const revising = dailyMenu.reviseState === 'revising'
+  // Préparer la veille est le cas d'usage de ces actions : elles suivent donc
+  // la règle de la révision, ouverte à demain, et non celle de la coche.
+  const foodActions = !readOnly && !revising
 
   function closeSheet() {
     setPicked(null)
@@ -81,7 +84,7 @@ export function DashboardScreen({
 
   function requestReplacement(food: PickedFood) {
     void revise(
-      `Je n'ai pas de ${food.item.name} pour le ${food.mealLabel}. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.`,
+      `Je n'ai pas de ${food.item.name.trim()} pour le ${food.mealLabel}. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.`,
     )
     closeSheet()
   }
@@ -152,6 +155,20 @@ export function DashboardScreen({
           </p>
         )}
 
+        {dailyMenu.reviseError && (
+          <p className="flex items-center gap-xs rounded-xl bg-error-container px-md py-sm font-body-md text-body-md text-on-error-container">
+            <Icon className="text-body-md" name="error" />
+            {dailyMenu.reviseError}
+          </p>
+        )}
+
+        {dailyMenu.reviseNotice && (
+          <p className="flex items-center gap-xs rounded-xl bg-surface-container px-md py-sm font-body-md text-caption text-on-surface-variant">
+            <Icon className="text-body-md" name="auto_awesome" />
+            {dailyMenu.reviseNotice}
+          </p>
+        )}
+
         {dropped.length > 0 && (
           <p className="rounded-xl bg-surface-container p-sm font-body-md text-caption text-on-surface-variant">
             {dropped.length === 1
@@ -175,15 +192,14 @@ export function DashboardScreen({
           entry.kind === 'meal' ? (
             <MealCard
               key={entry.meal.id}
-              busy={revising}
+              canCheckEaten={live}
+              canPickFood={foodActions}
               meal={entry.meal}
               onPickFood={(item) => {
-                if (!live || revising) return
                 setPicked({ item, mealLabel: entry.meal.slotLabel })
                 setReplaceOffered(false)
               }}
               onToggleEaten={toggleEaten}
-              readOnly={!live}
             />
           ) : (
             <ActivityCard
