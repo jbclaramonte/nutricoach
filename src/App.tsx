@@ -111,6 +111,7 @@ export default function App() {
           <DashboardScreen
             activities={activityStore}
             addTaste={profileStore.addTaste}
+            coachOpen={isCoach}
             configured={configured}
             dailyMenu={dailyMenu}
             day={day}

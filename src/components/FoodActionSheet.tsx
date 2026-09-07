@@ -13,6 +13,8 @@ interface FoodActionSheetProps {
   /** Vrai après un rejet : la feuille propose alors de remplacer l'aliment. */
   replaceOffered: boolean
   onReplace: () => void
+  /** Renseigné quand le goût n'a pas pu être enregistré ; la feuille reste ouverte. */
+  tasteError?: string
 }
 
 interface Action {
@@ -32,6 +34,7 @@ export function FoodActionSheet({
   onClose,
   replaceOffered,
   onReplace,
+  tasteError = '',
 }: FoodActionSheetProps) {
   const first = useRef<HTMLButtonElement>(null)
   const confirmation = useRef<HTMLParagraphElement>(null)
@@ -155,6 +158,15 @@ export function FoodActionSheet({
           </div>
         ) : (
           <div className="flex flex-col gap-xs px-margin-mobile pt-sm">
+            {tasteError && (
+              <p
+                className="flex items-center gap-xs rounded-xl bg-error-container px-md py-sm font-body-md text-body-md text-on-error-container"
+                role="alert"
+              >
+                <Icon className="text-body-md" name="error" />
+                {tasteError}
+              </p>
+            )}
             {actions.map((action, index) => (
               <button
                 className="flex items-center gap-sm rounded-2xl px-sm py-sm text-left transition-colors active:bg-surface-container"

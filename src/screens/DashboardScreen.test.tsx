@@ -38,7 +38,7 @@ const activities: UseActivitiesResult = {
   confirm: vi.fn(),
 }
 
-const addTaste = vi.fn()
+const addTaste = vi.fn(() => true)
 const revise = vi.fn()
 
 /** État de révision du menu, à part : la plupart des tests le laissent au repos. */
@@ -71,6 +71,7 @@ function screenOf(day: string, meals: Meal[] = [meal], error = '', revision: Rev
     <DashboardScreen
       activities={activities}
       addTaste={addTaste}
+      coachOpen={false}
       configured
       dailyMenu={menuStore(meals, error, revision)}
       day={day}
@@ -93,6 +94,7 @@ function openSheet() {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  addTaste.mockReturnValue(true)
 })
 
 describe('DashboardScreen', () => {
@@ -244,6 +246,47 @@ describe('DashboardScreen', () => {
     expect(revise).toHaveBeenCalledWith(
       "Je n'ai pas de Saumon pour le Déjeuner. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.",
     )
+  })
+
+  it("garde la feuille ouverte quand le goût n'a pas pu être enregistré", () => {
+    addTaste.mockReturnValue(false)
+    renderDay(todayKey())
+    openSheet()
+    fireEvent.click(screen.getByText("J'aime"))
+
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(
+      screen.getByText("Votre profil n'a pas pu être lu, ce choix n'a pas été enregistré."),
+    ).toBeTruthy()
+
+    fireEvent.click(screen.getByText("Je n'aime pas"))
+    expect(screen.queryByText('Le remplacer maintenant')).toBeNull()
+  })
+
+  it('masque le résultat de la révision sur demande', () => {
+    renderDay(todayKey(), [meal], '', { reviseNotice: 'Déjeuner remplacé.' })
+
+    fireEvent.click(screen.getByLabelText('Masquer le résultat de la révision'))
+
+    expect(screen.queryByText('Déjeuner remplacé.')).toBeNull()
+  })
+
+  it('laisse le résultat de la révision au volet coach quand il est ouvert', () => {
+    render(
+      <DashboardScreen
+        activities={activities}
+        addTaste={addTaste}
+        coachOpen
+        configured
+        dailyMenu={menuStore([meal], '', { reviseNotice: 'Déjeuner remplacé.' })}
+        day={todayKey()}
+        onDayChange={vi.fn()}
+        profile={DEFAULT_PROFILE}
+        readOnly={false}
+      />,
+    )
+
+    expect(screen.queryByText('Déjeuner remplacé.')).toBeNull()
   })
 
   it("affiche le résultat et l'erreur d'une révision", () => {
