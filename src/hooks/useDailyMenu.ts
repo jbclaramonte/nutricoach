@@ -205,7 +205,7 @@ export function useDailyMenu(
         messages,
         jsonSchema,
         temperature: 0.4,
-        maxTokens: 4000,
+        maxTokens: 6000,
       })
 
     ask()
@@ -342,7 +342,7 @@ export function useDailyMenu(
           messages,
           jsonSchema,
           temperature: 0.4,
-          maxTokens: 4000,
+          maxTokens: 6000,
         })
 
       try {
