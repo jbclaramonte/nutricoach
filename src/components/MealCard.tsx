@@ -1,16 +1,27 @@
-import type { Meal } from '../types'
+import type { FoodItem, Meal } from '../types'
 import { formatGrams, sumMeal } from '../lib/nutrition'
 import { Icon } from './Icon'
 
 interface MealCardProps {
   meal: Meal
   onToggleEaten: (mealId: string) => void
+  /** Ouvre les actions de l'aliment touché. */
+  onPickFood: (item: FoodItem) => void
   /** Vrai hors du jour même : le repas se lit, la coche n'a pas de sens. */
   readOnly?: boolean
+  /** Vrai pendant une révision du menu : un second geste porterait sur un menu périmé. */
+  busy?: boolean
 }
 
-export function MealCard({ meal, onToggleEaten, readOnly = false }: MealCardProps) {
+export function MealCard({
+  meal,
+  onToggleEaten,
+  onPickFood,
+  readOnly = false,
+  busy = false,
+}: MealCardProps) {
   const totals = sumMeal(meal.items)
+  const actionable = !readOnly && !busy
 
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
@@ -86,7 +97,22 @@ export function MealCard({ meal, onToggleEaten, readOnly = false }: MealCardProp
             <tbody className="text-on-surface">
               {meal.items.map((item) => (
                 <tr className="border-b border-outline-variant/30" key={item.name}>
-                  <td className="py-xs pr-xs">{item.name}</td>
+                  <td className="py-xs pr-xs">
+                    {actionable ? (
+                      // Le geste reste un simple appui sur un bouton : le tableau
+                      // défile encore horizontalement sans que rien ne l'intercepte.
+                      <button
+                        aria-label={`Actions pour ${item.name}`}
+                        className="w-full text-left underline decoration-outline-variant decoration-dotted underline-offset-4"
+                        onClick={() => onPickFood(item)}
+                        type="button"
+                      >
+                        {item.name}
+                      </button>
+                    ) : (
+                      item.name
+                    )}
+                  </td>
                   <td className="px-xs py-xs">{item.quantity}</td>
                   <td className="px-xs py-xs">{item.calories}</td>
                   <td className="px-xs py-xs">{formatGrams(item.protein)}</td>

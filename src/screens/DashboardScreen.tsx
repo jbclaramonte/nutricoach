@@ -144,6 +144,8 @@ export function DashboardScreen({
             <MealCard
               key={entry.meal.id}
               meal={entry.meal}
+              // Câblage des actions d'aliment à la tâche suivante.
+              onPickFood={() => {}}
               onToggleEaten={toggleEaten}
               readOnly={!live}
             />
