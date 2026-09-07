@@ -122,6 +122,77 @@ describe('useProfile.addTaste', () => {
     expect(result.current.profile.favorites).toEqual(['Saumon', 'Avocat'])
   })
 
+  it("n'annule pas un enregistrement encore en vol", async () => {
+    // Le goût part du profil que save() vient d'écrire, pas de celui d'avant :
+    // sinon l'enregistrement explicite de l'utilisateur serait défait.
+    let finishSave: () => void = () => {}
+    set.mockImplementationOnce(() => new Promise((resolve) => (finishSave = () => resolve())))
+    const { result } = renderHook(() => useProfile())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+
+    act(() => {
+      result.current.update({ weightKg: 90 })
+      result.current.save()
+    })
+    act(() => result.current.addTaste('favorites', 'Avocat'))
+    await act(async () => {
+      finishSave()
+    })
+
+    expect(written().weightKg).toBe(90)
+    expect(written().favorites).toEqual(['Saumon', 'Avocat'])
+  })
+
+  it('ne perd pas le premier goût quand deux actions se suivent', async () => {
+    let finishFirst: () => void = () => {}
+    set.mockImplementationOnce(() => new Promise((resolve) => (finishFirst = () => resolve())))
+    const { result } = renderHook(() => useProfile())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+
+    act(() => result.current.addTaste('favorites', 'Avocat'))
+    act(() => result.current.addTaste('favorites', 'Kiwi'))
+    await act(async () => {
+      finishFirst()
+    })
+
+    expect(written().favorites).toEqual(['Saumon', 'Avocat', 'Kiwi'])
+    expect(result.current.profile.favorites).toEqual(['Saumon', 'Avocat', 'Kiwi'])
+  })
+
+  it('revient au profil enregistré quand une écriture échoue', async () => {
+    // Sinon le goût rejeté par la base servirait de base à l'action suivante,
+    // qui l'écrirait alors qu'il n'a jamais été enregistré.
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    set.mockRejectedValueOnce(new Error('quota'))
+    const { result } = renderHook(() => useProfile())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+
+    act(() => result.current.addTaste('favorites', 'Avocat'))
+    await waitFor(() => expect(result.current.saveState).toBe('error'))
+    act(() => result.current.addTaste('favorites', 'Kiwi'))
+
+    expect(written().favorites).toEqual(['Saumon', 'Kiwi'])
+  })
+
+  it("ne recule pas le profil enregistré quand une écriture périmée échoue", async () => {
+    // L'échec tardif de la première écriture ne dit rien de la base : la
+    // seconde a réussi depuis, et c'est elle qui fait foi.
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    let failFirst: (reason: Error) => void = () => {}
+    set.mockImplementationOnce(() => new Promise((_, reject) => (failFirst = reject)))
+    const { result } = renderHook(() => useProfile())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+
+    act(() => result.current.addTaste('favorites', 'Avocat'))
+    act(() => result.current.addTaste('favorites', 'Kiwi'))
+    await act(async () => {
+      failFirst(new Error('quota'))
+    })
+    act(() => result.current.addTaste('favorites', 'Mangue'))
+
+    expect(written().favorites).toEqual(['Saumon', 'Avocat', 'Kiwi', 'Mangue'])
+  })
+
   it('renvoie true quand le goût est pris en compte', async () => {
     const { result } = renderHook(() => useProfile())
     await waitFor(() => expect(result.current.loaded).toBe(true))

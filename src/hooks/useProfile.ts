@@ -89,15 +89,24 @@ export function useProfile(): UseProfileResult {
     // Une écriture doublée par une plus récente ne dit plus rien de l'état
     // enregistré : son échec afficherait « Erreur » sur un profil bien écrit.
     const stale = () => writeGeneration.current !== generation
+    // Le profil enregistré est tenu à jour dès le départ : attendre la
+    // résolution ferait repartir une action lancée entre-temps d'un profil
+    // périmé, qui écraserait cette écriture-ci.
+    const previous = savedRef.current
+    savedRef.current = next
     setSaveState('saving')
     dbSet(KEY, next)
       .then(() => {
-        savedRef.current = next
         if (!stale()) setSaveState('saved')
       })
       .catch((error) => {
         console.error('[profile] écriture impossible', error)
-        if (!stale()) setSaveState('error')
+        // La base est restée sur la valeur précédente. Une écriture périmée ne
+        // restaure rien : elle reculerait le profil enregistré sous une
+        // écriture plus récente.
+        if (stale()) return
+        savedRef.current = previous
+        setSaveState('error')
       })
       .finally(() => {
         if (stale()) return
