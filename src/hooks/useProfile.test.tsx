@@ -79,10 +79,62 @@ describe('useProfile.addTaste', () => {
     get.mockImplementation(() => new Promise(() => {}))
     const { result } = renderHook(() => useProfile())
 
-    act(() => result.current.addTaste('favorites', 'Betterave'))
+    let accepted = true
+    act(() => {
+      accepted = result.current.addTaste('favorites', 'Betterave')
+    })
 
+    expect(accepted).toBe(false)
     expect(set).not.toHaveBeenCalled()
     expect(result.current.profile.favorites).toEqual(DEFAULT_PROFILE.favorites)
+  })
+
+  it("n'écrit rien après un échec de la lecture initiale", async () => {
+    // Le profil affiché est celui par défaut : l'écrire remplacerait le poids,
+    // les allergies et les objectifs enregistrés par ces valeurs-là.
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    get.mockRejectedValue(new Error('IndexedDB indisponible'))
+    const { result } = renderHook(() => useProfile())
+    await waitFor(() => expect(result.current.readFailed).toBe(true))
+
+    let accepted = true
+    act(() => {
+      accepted = result.current.addTaste('favorites', 'Betterave')
+    })
+
+    expect(accepted).toBe(false)
+    expect(set).not.toHaveBeenCalled()
+  })
+
+  it("ne persiste pas le brouillon non enregistré de l'écran Profil", async () => {
+    // Un poids tapé puis abandonné ne doit pas partir en base parce que
+    // l'utilisateur a touché un aliment depuis le menu.
+    const { result } = renderHook(() => useProfile())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+
+    act(() => result.current.update({ weightKg: 90 }))
+    act(() => result.current.addTaste('favorites', 'Avocat'))
+
+    expect(written().weightKg).toBe(stored.weightKg)
+    expect(written().favorites).toEqual(['Saumon', 'Avocat'])
+    // Le brouillon reste à l'écran, goût compris.
+    expect(result.current.profile.weightKg).toBe(90)
+    expect(result.current.profile.favorites).toEqual(['Saumon', 'Avocat'])
+  })
+
+  it('renvoie true quand le goût est pris en compte', async () => {
+    const { result } = renderHook(() => useProfile())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+
+    let added = false
+    let duplicate = false
+    act(() => {
+      added = result.current.addTaste('favorites', 'Avocat')
+      duplicate = result.current.addTaste('favorites', 'Saumon')
+    })
+
+    expect(added).toBe(true)
+    expect(duplicate).toBe(true)
   })
 
   it('passe en erreur quand le magasin refuse l’écriture', async () => {
