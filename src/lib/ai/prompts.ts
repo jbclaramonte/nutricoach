@@ -39,6 +39,7 @@ function describeMenu(menu: GeneratedMenu): string {
 export function buildCoachSystemPrompt(
   profile: Profile,
   activities: Activity[],
+  dayLabel: string,
   todaysMenu?: GeneratedMenu,
 ): string {
   const blocks: string[] = []
@@ -131,16 +132,18 @@ export function buildCoachSystemPrompt(
   const expected = activities.filter((activity) => activity.planned).map(describeActivity)
   blocks.push(
     [
-      'LA JOURNÉE',
-      day.length > 0 ? bulletList(day) : 'Aucune activité faite ou confirmée aujourd’hui.',
+      // Sans le jour nommé, le modèle raisonne toujours comme si la journée
+      // décrite était celle en cours.
+      `LA JOURNÉE — ${dayLabel}`,
+      day.length > 0 ? bulletList(day) : "Aucune activité faite ou confirmée ce jour-là.",
       ...(expected.length > 0
         ? [
-            'Activités prévues mais pas encore confirmées (leurs calories ne sont pas comptées dans la cible) :',
+            "Activités prévues mais pas encore confirmées (leurs calories ne sont pas comptées dans la cible) :",
             bulletList(expected),
           ]
         : []),
-      'Place et calibre les repas autour de ces séances.',
-    ].join('\n'),
+      "Place et calibre les repas autour de ces séances.",
+    ].join("\n"),
   )
 
   if (todaysMenu) {

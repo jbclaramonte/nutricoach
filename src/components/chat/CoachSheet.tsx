@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChatBar } from '../ChatBar'
 import { Icon } from '../Icon'
 import type { ChatMessage } from '../../lib/chat'
+import { dayLabel } from '../../lib/day'
 import { MessageBubble } from './MessageBubble'
 
 /** Hauteur du volet replié, en pourcentage de la fenêtre. */
@@ -35,6 +36,10 @@ interface CoachSheetProps {
   reviseError: string
   /** Phrase française résumant la dernière révision réussie, vide sinon. */
   reviseNotice: string
+  /** Jour de la conversation, au format AAAA-MM-JJ. */
+  day: string
+  /** Vrai pour un jour révolu : la conversation se relit, ne se poursuit pas. */
+  readOnly: boolean
 }
 
 export function CoachSheet({
@@ -52,6 +57,8 @@ export function CoachSheet({
   revising,
   reviseError,
   reviseNotice,
+  day,
+  readOnly,
 }: CoachSheetProps) {
   const bottom = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLDivElement>(null)
@@ -70,6 +77,7 @@ export function CoachSheet({
   const lastRequest = lastRequestIndex >= 0 ? messages[lastRequestIndex].text : ''
   const canApply =
     hasMenu &&
+    !readOnly &&
     !streaming &&
     last?.role === 'assistant' &&
     !last.failed &&
@@ -155,11 +163,11 @@ export function CoachSheet({
           <div className="flex flex-col">
             <span className="font-headline-md text-body-md text-on-surface">{coachName}</span>
             <span className="font-caption text-caption text-on-surface-variant">
-              {streaming ? 'Rédige une réponse…' : 'Votre coach nutrition'}
+              {streaming ? 'Rédige une réponse…' : `Votre coach nutrition — ${dayLabel(day).toLowerCase()}`}
             </span>
           </div>
           <div className="flex items-center gap-xs">
-            {messages.length > 0 && (
+            {messages.length > 0 && !readOnly && (
               <button
                 aria-label="Effacer la conversation"
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-on-surface-variant transition-colors active:bg-surface-container-highest"
@@ -261,10 +269,17 @@ export function CoachSheet({
             </button>
           )}
 
+          {readOnly && (
+            <p className="flex items-center gap-xs rounded-xl bg-surface-container p-sm font-body-md text-caption text-on-surface-variant">
+              <Icon className="text-body-md" name="history" />
+              Journée archivée — consultation seule.
+            </p>
+          )}
+
           <div ref={bottom} />
         </div>
 
-        <ChatBar coachName={coachName} disabled={!configured || !online} onSend={onSend} />
+        <ChatBar coachName={coachName} disabled={!configured || !online || readOnly} onSend={onSend} />
       </section>
     </div>
   )

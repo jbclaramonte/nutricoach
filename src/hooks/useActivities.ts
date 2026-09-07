@@ -1,43 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Activity } from '../lib/activities'
-import { dbDelete, dbGet, dbKeys, dbSet } from '../lib/db'
+import { dateOfKey, isToday } from '../lib/day'
+import { dbDelete, dbGet, dbSet } from '../lib/db'
 import { plannedActivitiesFor, type RecurringActivity } from '../lib/schedule'
 import { defaultActivities } from '../data/dashboard'
 
 const KEY_PREFIX = 'activities:'
 /** Ancien journal unique, antérieur au découpage par jour. */
 const LEGACY_KEY = 'activities:today'
-
-/** Clé du jour : un journal par date, au format AAAA-MM-JJ. */
-function todayKey(): string {
-  const now = new Date()
-  const month = `${now.getMonth() + 1}`.padStart(2, '0')
-  const day = `${now.getDate()}`.padStart(2, '0')
-  return `${KEY_PREFIX}${now.getFullYear()}-${month}-${day}`
-}
-
-/**
- * Sans ménage, le magasin accumulerait un journal par jour indéfiniment : les
- * entrées antérieures à celle du jour sont supprimées au chargement.
- */
-function purgeOldDays(currentKey: string): Promise<void> {
-  return dbKeys()
-    .then((keys) =>
-      Promise.all(
-        keys
-          // « activities:today » est l'ancien journal unique, antérieur au
-          // découpage par jour. Il trie après les clés datées et échapperait à
-          // la comparaison.
-          .filter(
-            (key) =>
-              key.startsWith(KEY_PREFIX) && (key < currentKey || key === LEGACY_KEY),
-          )
-          .map((key) => dbDelete(key)),
-      ),
-    )
-    .then(() => undefined)
-    .catch((purgeError) => console.error('[activities] purge impossible', purgeError))
-}
 
 interface StoredDay {
   activities: Activity[]
@@ -56,26 +26,37 @@ export interface UseActivitiesResult {
 export function useActivities(
   schedule: RecurringActivity[],
   scheduleLoaded: boolean,
+  day: string,
+  editable: boolean,
 ): UseActivitiesResult {
   const [stored, setStored] = useState<StoredDay | null>(null)
   const [loaded, setLoaded] = useState(false)
-  // Une session ouverte à cheval sur minuit écrirait le journal d'hier sous la
-  // clé d'aujourd'hui : on retient le jour lu, pour comparer à l'écriture.
-  const dayKey = useRef(todayKey())
+  const [shownDay, setShownDay] = useState(day)
+  const key = `${KEY_PREFIX}${day}`
+
+  // Le jour a changé : la remise à zéro se fait pendant le rendu, pas dans
+  // l'effet. Différée d'une frame, une écriture partie entre-temps porterait
+  // la journée précédente sous la clé du nouveau jour.
+  if (shownDay !== day) {
+    setShownDay(day)
+    setStored(null)
+    setLoaded(false)
+  }
 
   useEffect(() => {
     let cancelled = false
-    const key = todayKey()
-    dayKey.current = key
     dbGet<StoredDay>(key)
-      .then((day) => {
+      .then((existing) => {
         if (cancelled) return
-        if (day) {
-          setStored(day)
+        if (existing) {
+          setStored(existing)
           return
         }
-        // « activities:today » est l'ancien journal unique : il est repris sous
-        // la clé du jour avant que le ménage ne l'efface.
+        // « activities:today » est l'ancien journal unique : il ne peut être
+        // repris que sous la clé d'aujourd'hui, puis supprimé enchainé après
+        // pour éviter la race avec le ménage global qui pourrait le supprimer
+        // avant qu'on le lise.
+        if (!isToday(day)) return
         return dbGet<unknown>(LEGACY_KEY).then((legacy) => {
           if (cancelled || !Array.isArray(legacy)) return
           const migrated: StoredDay = {
@@ -83,31 +64,22 @@ export function useActivities(
             dismissedPlannedIds: [],
           }
           setStored(migrated)
-          return dbSet(key, migrated)
+          return dbSet(key, migrated).then(() => dbDelete(LEGACY_KEY))
         })
       })
       .catch((error) => console.error('[activities] lecture impossible', error))
-      .then(() => purgeOldDays(key))
       .finally(() => {
         if (!cancelled) setLoaded(true)
       })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [day, key])
 
   function persist(next: StoredDay) {
     // Tant que la lecture initiale n'a pas répondu, écrire écraserait des
     // données existantes avec une journée vide.
     if (!loaded) return
-    const key = todayKey()
-    if (key !== dayKey.current) {
-      // Le jour a changé depuis le chargement : on repart d'une journée vierge
-      // et l'effet de lecture reprend la main pour la nouvelle date.
-      setStored(null)
-      setLoaded(false)
-      return
-    }
     setStored(next)
     dbSet(key, next).catch((error) =>
       console.error('[activities] écriture impossible', error),
@@ -120,11 +92,12 @@ export function useActivities(
   // démo apparaîtrait brièvement à un utilisateur qui a un planning.
   const ready = loaded && scheduleLoaded
   const saved = ready
-    ? (stored?.activities ?? (schedule.length === 0 ? defaultActivities : []))
+    ? (stored?.activities ??
+      (isToday(day) && schedule.length === 0 ? defaultActivities : []))
     : []
   const dismissed = ready ? (stored?.dismissedPlannedIds ?? []) : []
 
-  const planned = plannedActivitiesFor(new Date(), schedule)
+  const planned = (ready ? plannedActivitiesFor(dateOfKey(day), schedule) : [])
     .filter(
       (activity) =>
         !dismissed.includes(activity.id) && !saved.some((entry) => entry.id === activity.id),
@@ -139,8 +112,16 @@ export function useActivities(
 
   return {
     activities,
-    add: (activity) => persist({ ...current(), activities: [...saved, activity] }),
+    add: (activity) => {
+      // Un jour archivé ou seulement prévu ne s'édite pas : une commande restée
+      // en vol après un changement de jour écrirait dans la mauvaise journée.
+      if (!editable) return
+      persist({ ...current(), activities: [...saved, activity] })
+    },
     remove: (activityId) => {
+      // Un jour archivé ou seulement prévu ne s'édite pas : une commande restée
+      // en vol après un changement de jour écrirait dans la mauvaise journée.
+      if (!editable) return
       // Une proposition n'est pas dans le journal : sans mémoire du refus, elle
       // réapparaîtrait au rendu suivant. Une proposition confirmée n'est plus
       // dans « planned » : c'est l'identifiant, seul, qui la désigne.
@@ -154,6 +135,9 @@ export function useActivities(
       })
     },
     confirm: (activityId) => {
+      // Un jour archivé ou seulement prévu ne s'édite pas : une commande restée
+      // en vol après un changement de jour écrirait dans la mauvaise journée.
+      if (!editable) return
       const proposal = planned.find((entry) => entry.id === activityId)
       if (!proposal) return
       persist({ ...current(), activities: [...saved, { ...proposal, planned: false }] })

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dbDelete, dbGet, dbKeys, dbSet } from '../lib/db'
+import { dayLabel } from '../lib/day'
+import { dbGet, dbSet } from '../lib/db'
 import { fileToDataUrl } from '../lib/ai/images'
 import { buildCoachSystemPrompt } from '../lib/ai/prompts'
 import type { GeneratedMenu } from '../lib/ai/menuSchema'
@@ -16,36 +17,6 @@ const KEY_PREFIX = 'chat:'
 // Chaque question part seule au modèle : le plafond ne borne donc que la place
 // prise dans IndexedDB par l'historique affiché.
 const MAX_MESSAGES = 100
-
-/** Clé du jour : une conversation par date, au format AAAA-MM-JJ. */
-function todayKey(): string {
-  const now = new Date()
-  const month = `${now.getMonth() + 1}`.padStart(2, '0')
-  const day = `${now.getDate()}`.padStart(2, '0')
-  return `${KEY_PREFIX}${now.getFullYear()}-${month}-${day}`
-}
-
-/**
- * Sans ménage, le magasin accumulerait une conversation par jour indéfiniment :
- * les entrées antérieures à celle du jour sont supprimées au chargement.
- */
-function purgeOldChats(currentKey: string): Promise<void> {
-  return dbKeys()
-    .then((keys) =>
-      Promise.all(
-        keys
-          // « chat:messages » est l'ancien fil unique, antérieur au découpage par
-          // jour. Il trie après les clés datées et échapperait à la comparaison.
-          .filter(
-            (key) =>
-              key.startsWith(KEY_PREFIX) && (key < currentKey || key === 'chat:messages'),
-          )
-          .map((key) => dbDelete(key)),
-      ),
-    )
-    .then(() => undefined)
-    .catch((purgeError) => console.error('[chat] purge impossible', purgeError))
-}
 
 export type ChatState = 'idle' | 'streaming' | 'error'
 
@@ -74,6 +45,8 @@ export function useCoachChat(
   activities: Activity[],
   todaysMenu: GeneratedMenu | null,
   models: ORModel[],
+  day: string,
+  editable: boolean,
 ): UseCoachChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [state, setState] = useState<ChatState>('idle')
@@ -83,6 +56,12 @@ export function useCoachChat(
   // Miroir synchrone des messages : pendant un flux, l'updater de setMessages
   // est différé et lire son résultat tout de suite donnerait un historique vide.
   const messagesRef = useRef<ChatMessage[]>([])
+  const [shownDay, setShownDay] = useState(day)
+  // Miroir synchrone du jour affiché : un flux dure, et sa fin doit savoir hors
+  // rendu si elle concerne encore la conversation à l'écran.
+  const dayRef = useRef(day)
+
+  const key = `${KEY_PREFIX}${day}`
 
   /** Unique point d'écriture des messages : garde le miroir à jour. */
   const applyMessages = useCallback(
@@ -95,33 +74,68 @@ export function useCoachChat(
     [],
   )
 
+  // Le jour a changé : la remise à zéro se fait pendant le rendu, pas dans un
+  // effet. Différée d'une frame, la conversation de la veille resterait à
+  // l'écran sous le nouveau jour, et une écriture partie entre-temps la porterait
+  // sous sa clé.
+  if (shownDay !== day) {
+    setShownDay(day)
+    // Écriture d'un miroir, idempotente et dérivée de la seule prop `day`, dans
+    // le bloc d'ajustement d'état pendant le rendu : rien n'en dépend à
+    // l'affichage, seuls les appels différés la relisent.
+    // oxlint-disable-next-line react/refs
+    dayRef.current = day
+    // Le flux en cours est coupé par le nettoyage de l'effet de chargement, un
+    // instant plus tard : ce qu'il rapporterait entre-temps est écarté par
+    // `stale()`, pas par l'interruption.
+    // La conversation du jour précédent ne fait plus autorité : celle du nouveau
+    // jour doit pouvoir être relue du magasin. Même nature que ci-dessus :
+    // valeur constante, réécrite à l'identique si le rendu est rejoué.
+    // oxlint-disable-next-line react/refs
+    loaded.current = false
+    // `applyMessages` ne fait que remettre le miroir et l'état à la même valeur
+    // vide : sûr à rejouer, et l'état affiché passe bien par `setMessages`.
+    // oxlint-disable-next-line react/refs
+    applyMessages([])
+    setState('idle')
+    setError('')
+  }
+
   useEffect(() => {
     let cancelled = false
-    const key = todayKey()
-    void purgeOldChats(key)
     dbGet<ChatMessage[]>(key)
       .then((stored) => {
         if (!cancelled && stored) applyMessages(stored)
       })
       .catch((readError) => console.error('[chat] lecture impossible', readError))
       .finally(() => {
-        loaded.current = true
+        // Sans `cancelled`, la lecture du jour quitté relâcherait le verrou
+        // alors que celle du nouveau jour est encore en vol : la première
+        // écriture qui suit remplacerait la conversation enregistrée de ce jour.
+        if (!cancelled) loaded.current = true
       })
     return () => {
       cancelled = true
       controller.current?.abort()
     }
-  }, [applyMessages])
+  }, [applyMessages, key])
 
-  const persist = useCallback((next: ChatMessage[]) => {
-    // Tant que la lecture initiale n'a pas répondu, écrire effacerait
-    // l'historique déjà enregistré.
-    if (!loaded.current) return
-    dbSet(todayKey(), next).catch((writeError) => console.error('[chat] écriture impossible', writeError))
-  }, [])
+  const persist = useCallback(
+    (next: ChatMessage[]) => {
+      // Tant que la lecture initiale n'a pas répondu, écrire effacerait
+      // l'historique déjà enregistré.
+      if (!loaded.current) return
+      dbSet(key, next).catch((writeError) => console.error('[chat] écriture impossible', writeError))
+    },
+    // Sans `key`, un envoi parti avant un changement de jour écrirait sa
+    // conversation sous la clé de l'ancien jour.
+    [key],
+  )
 
   const send = useCallback(
     (text: string, photo: File | null) => {
+      // Un jour archivé ou seulement consulté ne se modifie pas.
+      if (!editable) return
       // Un second envoi pendant un flux mélangerait les deux réponses.
       if (state === 'streaming') return
       if (!isConfigured(settings)) {
@@ -139,6 +153,12 @@ export function useCoachChat(
         return
       }
 
+      // Le flux dure : si le jour change entre temps, cette réponse ne concerne
+      // plus la conversation à l'écran et ne doit ni s'afficher, ni s'écrire
+      // sous la clé du nouveau jour. Couper le flux ne suffit pas, sa promesse
+      // se résout tout de même sur ce qui est déjà arrivé.
+      const stale = () => dayRef.current !== day
+
       setError('')
       setState('streaming')
 
@@ -152,6 +172,7 @@ export function useCoachChat(
 
       prepare
         .then((attachment) => {
+          if (stale()) return
           const userMessage: ChatMessage = {
             id: newId(),
             role: 'user',
@@ -174,13 +195,14 @@ export function useCoachChat(
             apiKey: settings.apiKey.trim(),
             model: settings.modelId,
             messages: toOrMessages(
-              buildCoachSystemPrompt(profile, activities, todaysMenu ?? undefined),
+              buildCoachSystemPrompt(profile, activities, dayLabel(day), todaysMenu ?? undefined),
               [userMessage],
             ),
             temperature: 0.6,
             maxTokens: 4000,
             signal: abort.signal,
             onDelta: (delta) => {
+              if (stale()) return
               applyMessages((current) =>
                 current.map((message) =>
                   message.id === replyId ? { ...message, text: message.text + delta } : message,
@@ -188,6 +210,7 @@ export function useCoachChat(
               )
             },
           }).then(({ finishReason }) => {
+            if (stale()) return
             // Une fin non annoncée signale une coupure côté fournisseur : la
             // réponse est incomplète et doit être présentée comme telle plutôt
             // que de passer pour terminée.
@@ -213,6 +236,7 @@ export function useCoachChat(
         })
         .catch((sendError) => {
           console.error('[chat] envoi impossible', sendError)
+          if (stale()) return
           // Le message de l'utilisateur reste à l'écran : seul le tour du coach
           // est marqué en échec.
           setError(
@@ -230,10 +254,13 @@ export function useCoachChat(
           )
         })
         .finally(() => {
+          // Après un changement de jour, `controller` peut déjà porter le flux
+          // de la nouvelle journée : l'effacer priverait `stop` de sa prise.
+          if (stale()) return
           controller.current = null
         })
     },
-    [activities, applyMessages, models, persist, profile, settings, state, todaysMenu],
+    [activities, applyMessages, day, editable, models, persist, profile, settings, state, todaysMenu],
   )
 
   const stop = useCallback(() => {
@@ -252,13 +279,15 @@ export function useCoachChat(
   }, [applyMessages, persist])
 
   const clear = useCallback(() => {
+    // Un jour archivé ou seulement consulté ne se modifie pas.
+    if (!editable) return
     controller.current?.abort()
     controller.current = null
     setState('idle')
     setError('')
     applyMessages([])
     persist([])
-  }, [applyMessages, persist])
+  }, [applyMessages, editable, persist])
 
   return { messages, state, error, send, stop, clear }
 }

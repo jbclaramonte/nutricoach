@@ -6,6 +6,10 @@ interface MenuStateCardProps {
   /** false tant que la clé et le modèle ne sont pas renseignés. */
   configured: boolean
   error: string
+  /** Libellé du jour affiché : la carte parle de la journée à l'écran. */
+  dayLabel: string
+  /** Vrai quand la journée à l'écran est celle de demain. */
+  tomorrow: boolean
   onGenerate: () => void
 }
 
@@ -29,7 +33,14 @@ function Skeleton() {
   )
 }
 
-export function MenuStateCard({ state, configured, error, onGenerate }: MenuStateCardProps) {
+export function MenuStateCard({
+  state,
+  configured,
+  error,
+  dayLabel,
+  tomorrow,
+  onGenerate,
+}: MenuStateCardProps) {
   if (state === 'loading') return <Skeleton />
 
   return (
@@ -43,7 +54,7 @@ export function MenuStateCard({ state, configured, error, onGenerate }: MenuStat
       ) : (
         <p className="font-body-md text-body-md text-on-surface-variant">
           {configured
-            ? "Aucun menu pour aujourd'hui. Dr. Anya peut le composer à partir de votre profil et de vos activités."
+            ? `Aucun menu pour ${dayLabel.toLocaleLowerCase('fr-FR')}. Dr. Anya peut le composer à partir de votre profil et de vos activités.`
             : 'Configurez votre clé OpenRouter pour générer votre menu'}
         </p>
       )}
@@ -55,7 +66,9 @@ export function MenuStateCard({ state, configured, error, onGenerate }: MenuStat
           type="button"
         >
           <Icon className="text-body-md" name="auto_awesome" />
-          <span>{state === 'error' ? 'Réessayer' : 'Générer mon menu'}</span>
+          <span>
+            {state === 'error' ? 'Réessayer' : tomorrow ? 'Générer le menu de demain' : 'Générer mon menu'}
+          </span>
         </button>
       ) : (
         <a

@@ -5,9 +5,11 @@ import { Icon } from './Icon'
 interface MealCardProps {
   meal: Meal
   onToggleEaten: (mealId: string) => void
+  /** Vrai hors du jour même : le repas se lit, la coche n'a pas de sens. */
+  readOnly?: boolean
 }
 
-export function MealCard({ meal, onToggleEaten }: MealCardProps) {
+export function MealCard({ meal, onToggleEaten, readOnly = false }: MealCardProps) {
   const totals = sumMeal(meal.items)
 
   return (
@@ -46,17 +48,28 @@ export function MealCard({ meal, onToggleEaten }: MealCardProps) {
               </p>
             )}
           </div>
-          <button
-            aria-label={meal.eaten ? `Marquer ${meal.slotLabel} comme non pris` : `Marquer ${meal.slotLabel} comme pris`}
-            aria-pressed={meal.eaten}
-            className={`flex items-center justify-center rounded-full p-1 transition-colors ${
-              meal.eaten ? 'bg-primary/10 text-primary' : 'bg-surface-container text-on-surface-variant'
-            }`}
-            onClick={() => onToggleEaten(meal.id)}
-            type="button"
-          >
-            <Icon filled={meal.eaten} name={meal.eaten ? 'check_circle' : 'radio_button_unchecked'} />
-          </button>
+          {!readOnly && (
+            <button
+              aria-label={
+                meal.eaten
+                  ? `Marquer ${meal.slotLabel} comme non pris`
+                  : `Marquer ${meal.slotLabel} comme pris`
+              }
+              aria-pressed={meal.eaten}
+              className={`flex items-center justify-center rounded-full p-1 transition-colors ${
+                meal.eaten
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-surface-container text-on-surface-variant'
+              }`}
+              onClick={() => onToggleEaten(meal.id)}
+              type="button"
+            >
+              <Icon
+                filled={meal.eaten}
+                name={meal.eaten ? 'check_circle' : 'radio_button_unchecked'}
+              />
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto">

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dbDelete, dbGet, dbKeys, dbSet } from '../lib/db'
+import { dayLabel, isToday } from '../lib/day'
+import { dbGet, dbSet } from '../lib/db'
 import { findAllergyViolations } from '../lib/ai/allergies'
 import { parseMenu } from '../lib/ai/menuParse'
 import { toDashboardMeals } from '../lib/ai/menuMap'
@@ -20,7 +21,6 @@ import { complete } from '../lib/openrouter/client'
 import { describeError } from '../lib/openrouter/errors'
 import type { ORMessage, ORModel } from '../lib/openrouter/types'
 import type { Meal } from '../types'
-import { dashboardData } from '../data/dashboard'
 
 interface StoredMenu {
   generatedAt: number
@@ -57,31 +57,6 @@ export interface UseDailyMenuResult {
 
 const KEY_PREFIX = 'menu:'
 
-/** Clé du jour : un menu par date, au format AAAA-MM-JJ. */
-function todayKey(): string {
-  const now = new Date()
-  const month = `${now.getMonth() + 1}`.padStart(2, '0')
-  const day = `${now.getDate()}`.padStart(2, '0')
-  return `${KEY_PREFIX}${now.getFullYear()}-${month}-${day}`
-}
-
-/**
- * Sans ménage, le magasin accumulerait un menu par jour indéfiniment : les
- * entrées antérieures à celle du jour sont supprimées au chargement.
- */
-function purgeOldMenus(currentKey: string): Promise<void> {
-  return dbKeys()
-    .then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key.startsWith(KEY_PREFIX) && key < currentKey)
-          .map((key) => dbDelete(key)),
-      ),
-    )
-    .then(() => undefined)
-    .catch((purgeError) => console.error('[menu] purge impossible', purgeError))
-}
-
 const PARSE_MESSAGES: Record<'not-json' | 'wrong-shape' | 'no-valid-meal', string> = {
   'not-json': "Le modèle n'a pas répondu en JSON : réessayez, ou choisissez un autre modèle.",
   'wrong-shape': "La réponse du modèle n'a pas la forme attendue : réessayez.",
@@ -98,6 +73,8 @@ export function useDailyMenu(
   profileLoaded: boolean,
   activities: Activity[],
   models: ORModel[],
+  day: string,
+  editable: boolean,
 ): UseDailyMenuResult {
   const [stored, setStored] = useState<StoredMenu | null>(null)
   const [state, setState] = useState<MenuState>('idle')
@@ -106,24 +83,62 @@ export function useDailyMenu(
   const [reviseState, setReviseState] = useState<ReviseState>('idle')
   const [reviseError, setReviseError] = useState('')
   const [reviseNotice, setReviseNotice] = useState('')
+  const [shownDay, setShownDay] = useState(day)
+  // Miroir synchrone du jour affiché : les appels au modèle durent, et leur
+  // réponse doit savoir hors rendu si elle concerne encore le jour à l'écran.
+  const dayRef = useRef(day)
   const loaded = useRef(false)
   // Miroir synchrone du menu enregistré : la révision lit l'état courant hors
   // rendu, où `stored` serait celui capturé à la création du callback.
   const storedRef = useRef<StoredMenu | null>(null)
 
+  const key = `${KEY_PREFIX}${day}`
+
+  // Le jour a changé : la remise à zéro se fait pendant le rendu, pas dans
+  // l'effet. Différée d'une frame, une écriture partie entre-temps porterait le
+  // menu de la veille sous la clé du nouveau jour.
+  if (shownDay !== day) {
+    setShownDay(day)
+    // Écriture d'un miroir, idempotente et dérivée de la seule prop `day`, dans
+    // le bloc d'ajustement d'état pendant le rendu : rien n'en dépend à
+    // l'affichage, seuls les appels différés la relisent.
+    // oxlint-disable-next-line react/refs
+    dayRef.current = day
+    setStored(null)
+    // Même nature : le miroir est remis à la même valeur vide que l'état, sûr
+    // à rejouer si le rendu l'est, et seuls les appels différés le relisent.
+    // oxlint-disable-next-line react/refs
+    storedRef.current = null
+    // Le menu du jour précédent ne fait plus autorité : celui du nouveau jour
+    // doit pouvoir être relu du magasin. Valeur constante, réécrite à
+    // l'identique si le rendu est rejoué.
+    // oxlint-disable-next-line react/refs
+    loaded.current = false
+    setState('idle')
+    setError('')
+    setDropped([])
+    setReviseState('idle')
+    setReviseError('')
+    setReviseNotice('')
+  }
+
   /** Unique point d'écriture du menu : garde le miroir et le magasin à jour. */
-  const applyStored = useCallback((next: StoredMenu) => {
-    storedRef.current = next
-    setStored(next)
-    return dbSet(todayKey(), next)
-  }, [])
+  const applyStored = useCallback(
+    (next: StoredMenu) => {
+      storedRef.current = next
+      setStored(next)
+      return dbSet(key, next)
+    },
+    // Sans `key`, une génération lancée avant un changement de jour écrirait
+    // son menu sous la clé de l'ancien jour.
+    [key],
+  )
 
   useEffect(() => {
     // Les allergies sont relues du menu en cache : tant que le profil enregistré
     // n'a pas répondu, la liste serait celle du profil par défaut, donc vide.
     if (!profileLoaded) return
     let cancelled = false
-    const key = todayKey()
     dbGet<StoredMenu>(key)
       .then((cached) => {
         // Une génération plus récente a déjà pris la main : elle fait autorité.
@@ -143,19 +158,23 @@ export function useDailyMenu(
         setState('ready')
       })
       .catch((readError) => console.error('[menu] lecture impossible', readError))
-      .finally(() => {
-        if (!cancelled) void purgeOldMenus(key)
-      })
     return () => {
       cancelled = true
     }
     // La relecture ne se fait qu'au premier profil chargé : les modifications
     // ultérieures d'allergies sont couvertes par la génération.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileLoaded])
+  }, [profileLoaded, key])
 
   const generate = useCallback(() => {
+    // Un jour archivé ou seulement consulté ne se modifie pas.
+    if (!editable) return
     if (!isConfigured(settings)) return
+
+    // La réponse arrive après plusieurs secondes : si le jour a changé entre
+    // temps, ce menu-là n'est plus celui de la journée à l'écran et ne doit ni
+    // s'afficher, ni s'écrire sous la clé du nouveau jour.
+    const stale = () => dayRef.current !== day
 
     // Le schéma strict n'est envoyé qu'aux modèles qui l'annoncent : un modèle
     // inconnu du catalogue le refuserait par une erreur 400.
@@ -163,8 +182,8 @@ export function useDailyMenu(
     const jsonSchema = model?.supportsStructuredOutputs ? MENU_JSON_SCHEMA : undefined
 
     const messages: ORMessage[] = [
-      { role: 'system', content: buildCoachSystemPrompt(profile, activities) },
-      { role: 'user', content: buildMenuRequest(dashboardData.dateLabel, jsonSchema !== undefined) },
+      { role: 'system', content: buildCoachSystemPrompt(profile, activities, dayLabel(day)) },
+      { role: 'user', content: buildMenuRequest(dayLabel(day), jsonSchema !== undefined) },
     ]
 
     setState('loading')
@@ -182,6 +201,7 @@ export function useDailyMenu(
 
     ask()
       .then(async (raw) => {
+        if (stale()) return
         let parsed = parseMenu(raw)
         if (!parsed.ok) throw new Error(PARSE_MESSAGES[parsed.reason])
 
@@ -217,6 +237,7 @@ export function useDailyMenu(
           menu: parsed.menu,
           eatenIds: [],
         }
+        if (stale()) return
         loaded.current = true
         setDropped(parsed.dropped)
         setReviseError('')
@@ -228,6 +249,7 @@ export function useDailyMenu(
       .catch((generateError) => {
         // Le menu déjà enregistré reste à l'écran : un échec n'efface rien.
         console.error('[menu] génération impossible', generateError)
+        if (stale()) return
         setError(
           generateError instanceof Error && !('kind' in generateError)
             ? generateError.message
@@ -235,10 +257,15 @@ export function useDailyMenu(
         )
         setState('error')
       })
-  }, [activities, applyStored, models, profile, settings])
+  }, [activities, applyStored, day, editable, models, profile, settings])
 
   const toggleEaten = useCallback(
     (id: string) => {
+      // Un jour archivé ou seulement consulté ne se modifie pas.
+      if (!editable) return
+      // Cocher un repas est un geste du présent : ni un jour archivé ni un jour
+      // à venir n'ont de repas « pris ».
+      if (!isToday(day)) return
       const current = storedRef.current
       if (!current) return
       const eatenIds = current.eatenIds ?? []
@@ -252,16 +279,22 @@ export function useDailyMenu(
         console.error('[menu] écriture impossible', writeError),
       )
     },
-    [applyStored],
+    [applyStored, day, editable],
   )
 
   const revise = useCallback(
     async (request: string) => {
+      // Un jour archivé ou seulement consulté ne se modifie pas.
+      if (!editable) return
       const current = storedRef.current
       if (!current || !isConfigured(settings) || !request.trim()) return
 
       const model = models.find((entry) => entry.id === settings.modelId)
       const jsonSchema = model?.supportsStructuredOutputs ? MENU_JSON_SCHEMA : undefined
+
+      // Même garde qu'à la génération : une révision revenue après un
+      // changement de jour ne concerne plus la journée à l'écran.
+      const stale = () => dayRef.current !== day
 
       const eatenIds = current.eatenIds ?? []
       const frozenSlots = current.menu.meals
@@ -271,7 +304,7 @@ export function useDailyMenu(
       const remainingKcal = Math.max(0, dailyTarget(profile, activities) - consumedKcal)
 
       const messages: ORMessage[] = [
-        { role: 'system', content: buildCoachSystemPrompt(profile, activities) },
+        { role: 'system', content: buildCoachSystemPrompt(profile, activities, dayLabel(day), current.menu) },
         {
           role: 'user',
           content: buildRevisionRequest(
@@ -301,6 +334,7 @@ export function useDailyMenu(
 
       try {
         const raw = await ask()
+        if (stale()) return
         let parsed = parseMenu(raw)
         if (!parsed.ok) throw new Error(PARSE_MESSAGES[parsed.reason])
 
@@ -328,6 +362,7 @@ export function useDailyMenu(
           )
         }
 
+        if (stale()) return
         const { menu: guarded, restored } = restoreFrozenMeals(current.menu, parsed.menu, eatenIds)
 
         const next: StoredMenu = {
@@ -352,6 +387,7 @@ export function useDailyMenu(
       } catch (reviseFailure) {
         // Le menu enregistré reste à l'écran : un échec de révision n'efface rien.
         console.error('[menu] révision impossible', reviseFailure)
+        if (stale()) return
         setReviseError(
           reviseFailure instanceof Error && !('kind' in reviseFailure)
             ? reviseFailure.message
@@ -360,7 +396,7 @@ export function useDailyMenu(
         setReviseState('error')
       }
     },
-    [activities, applyStored, models, profile, settings],
+    [activities, applyStored, day, editable, models, profile, settings],
   )
 
   // Dernier filet, évalué à chaque rendu : déclarer une allergie doit retirer
