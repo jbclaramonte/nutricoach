@@ -18,10 +18,11 @@ export interface UseProfileResult {
   save: () => void
   /**
    * Classe un aliment dans une liste de goûts et enregistre aussitôt.
-   * Renvoie false quand le goût n'a pas pu être pris en compte, faute d'un
-   * profil enregistré connu : l'appelant doit alors le dire à l'utilisateur.
+   * La promesse se résout après l'écriture, à false quand le goût n'a pas été
+   * enregistré — écriture refusée, profil enregistré inconnu ou libellé vide :
+   * l'appelant doit alors le dire à l'utilisateur.
    */
-  addTaste: (list: 'favorites' | 'dislikes', food: string) => boolean
+  addTaste: (list: 'favorites' | 'dislikes', food: string) => Promise<boolean>
 }
 
 /** Comparaison des goûts : « Coriandre » et « coriandre » sont le même aliment. */
@@ -83,8 +84,11 @@ export function useProfile(): UseProfileResult {
     setProfile(next)
   }
 
-  /** Unique point d'écriture du profil : porte aussi le cycle de saveState. */
-  function persist(next: Profile) {
+  /**
+   * Unique point d'écriture du profil : porte aussi le cycle de saveState.
+   * Résout à false quand le magasin a refusé l'écriture.
+   */
+  function persist(next: Profile): Promise<boolean> {
     const generation = ++writeGeneration.current
     // Une écriture doublée par une plus récente ne dit plus rien de l'état
     // enregistré : son échec afficherait « Erreur » sur un profil bien écrit.
@@ -95,18 +99,20 @@ export function useProfile(): UseProfileResult {
     const previous = savedRef.current
     savedRef.current = next
     setSaveState('saving')
-    dbSet(KEY, next)
+    return dbSet(KEY, next)
       .then(() => {
         if (!stale()) setSaveState('saved')
+        return true
       })
       .catch((error) => {
         console.error('[profile] écriture impossible', error)
         // La base est restée sur la valeur précédente. Une écriture périmée ne
         // restaure rien : elle reculerait le profil enregistré sous une
         // écriture plus récente.
-        if (stale()) return
+        if (stale()) return false
         savedRef.current = previous
         setSaveState('error')
+        return false
       })
       .finally(() => {
         if (stale()) return
@@ -116,10 +122,10 @@ export function useProfile(): UseProfileResult {
   }
 
   function save() {
-    persist(profileRef.current)
+    void persist(profileRef.current)
   }
 
-  function addTaste(list: 'favorites' | 'dislikes', food: string): boolean {
+  async function addTaste(list: 'favorites' | 'dislikes', food: string): Promise<boolean> {
     // Écrire avant la fin de la lecture initiale, ou après son échec, écraserait
     // le profil enregistré par les valeurs par défaut.
     const stored = savedRef.current
@@ -139,8 +145,25 @@ export function useProfile(): UseProfileResult {
     const draft: Profile = { ...profileRef.current, ...tastes }
     profileRef.current = draft
     setProfile(draft)
-    persist({ ...stored, ...tastes })
-    return true
+    const ok = await persist({ ...stored, ...tastes })
+    // Le goût s'affiche sans attendre l'écriture ; refusée, il ne doit pas
+    // rester à l'écran comme s'il était acquis. Les goûts repartent de
+    // `savedRef`, déjà restauré, ce qui les laisse cohérents avec la base même
+    // si une action plus récente est passée entre-temps.
+    if (!ok) showTastesOf(savedRef.current)
+    return ok
+  }
+
+  /** Réaligne les goûts affichés sur un profil de référence, brouillon gardé. */
+  function showTastesOf(reference: Profile | null) {
+    if (!reference) return
+    const next: Profile = {
+      ...profileRef.current,
+      favorites: reference.favorites,
+      dislikes: reference.dislikes,
+    }
+    profileRef.current = next
+    setProfile(next)
   }
 
   return { profile, loaded, readFailed, saveState, update, save, addTaste }

@@ -35,7 +35,7 @@ describe('useProfile.addTaste', () => {
     const { result } = renderHook(() => useProfile())
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
-    act(() => result.current.addTaste('favorites', 'Avocat'))
+    await act(() => result.current.addTaste('favorites', 'Avocat'))
 
     expect(result.current.profile.favorites).toEqual(['Saumon', 'Avocat'])
     expect(written().favorites).toEqual(['Saumon', 'Avocat'])
@@ -46,7 +46,7 @@ describe('useProfile.addTaste', () => {
     const { result } = renderHook(() => useProfile())
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
-    act(() => result.current.addTaste('dislikes', 'Céleri'))
+    await act(() => result.current.addTaste('dislikes', 'Céleri'))
 
     expect(result.current.profile.dislikes).toEqual(['Coriandre', 'Céleri'])
     expect(written().dislikes).toEqual(['Coriandre', 'Céleri'])
@@ -56,8 +56,8 @@ describe('useProfile.addTaste', () => {
     const { result } = renderHook(() => useProfile())
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
-    act(() => result.current.addTaste('favorites', 'Saumon'))
-    act(() => result.current.addTaste('favorites', '  saumon '))
+    await act(() => result.current.addTaste('favorites', 'Saumon'))
+    await act(() => result.current.addTaste('favorites', '  saumon '))
 
     expect(result.current.profile.favorites).toEqual(['Saumon'])
     expect(set).not.toHaveBeenCalled()
@@ -67,21 +67,21 @@ describe('useProfile.addTaste', () => {
     const { result } = renderHook(() => useProfile())
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
-    act(() => result.current.addTaste('favorites', 'coriandre'))
+    await act(() => result.current.addTaste('favorites', 'coriandre'))
 
     expect(result.current.profile.favorites).toEqual(['Saumon', 'coriandre'])
     expect(result.current.profile.dislikes).toEqual([])
     expect(written().dislikes).toEqual([])
   })
 
-  it("n'écrit rien tant que la lecture initiale n'a pas répondu", () => {
+  it("n'écrit rien tant que la lecture initiale n'a pas répondu", async () => {
     // Sinon le profil enregistré serait écrasé par les valeurs par défaut.
     get.mockImplementation(() => new Promise(() => {}))
     const { result } = renderHook(() => useProfile())
 
     let accepted = true
-    act(() => {
-      accepted = result.current.addTaste('favorites', 'Betterave')
+    await act(async () => {
+      accepted = await result.current.addTaste('favorites', 'Betterave')
     })
 
     expect(accepted).toBe(false)
@@ -98,8 +98,8 @@ describe('useProfile.addTaste', () => {
     await waitFor(() => expect(result.current.readFailed).toBe(true))
 
     let accepted = true
-    act(() => {
-      accepted = result.current.addTaste('favorites', 'Betterave')
+    await act(async () => {
+      accepted = await result.current.addTaste('favorites', 'Betterave')
     })
 
     expect(accepted).toBe(false)
@@ -113,7 +113,7 @@ describe('useProfile.addTaste', () => {
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
     act(() => result.current.update({ weightKg: 90 }))
-    act(() => result.current.addTaste('favorites', 'Avocat'))
+    await act(() => result.current.addTaste('favorites', 'Avocat'))
 
     expect(written().weightKg).toBe(stored.weightKg)
     expect(written().favorites).toEqual(['Saumon', 'Avocat'])
@@ -134,7 +134,7 @@ describe('useProfile.addTaste', () => {
       result.current.update({ weightKg: 90 })
       result.current.save()
     })
-    act(() => result.current.addTaste('favorites', 'Avocat'))
+    act(() => void result.current.addTaste('favorites', 'Avocat'))
     await act(async () => {
       finishSave()
     })
@@ -149,8 +149,8 @@ describe('useProfile.addTaste', () => {
     const { result } = renderHook(() => useProfile())
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
-    act(() => result.current.addTaste('favorites', 'Avocat'))
-    act(() => result.current.addTaste('favorites', 'Kiwi'))
+    act(() => void result.current.addTaste('favorites', 'Avocat'))
+    await act(() => result.current.addTaste('favorites', 'Kiwi'))
     await act(async () => {
       finishFirst()
     })
@@ -167,9 +167,9 @@ describe('useProfile.addTaste', () => {
     const { result } = renderHook(() => useProfile())
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
-    act(() => result.current.addTaste('favorites', 'Avocat'))
+    await act(() => result.current.addTaste('favorites', 'Avocat'))
     await waitFor(() => expect(result.current.saveState).toBe('error'))
-    act(() => result.current.addTaste('favorites', 'Kiwi'))
+    await act(() => result.current.addTaste('favorites', 'Kiwi'))
 
     expect(written().favorites).toEqual(['Saumon', 'Kiwi'])
   })
@@ -183,14 +183,31 @@ describe('useProfile.addTaste', () => {
     const { result } = renderHook(() => useProfile())
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
-    act(() => result.current.addTaste('favorites', 'Avocat'))
-    act(() => result.current.addTaste('favorites', 'Kiwi'))
+    act(() => void result.current.addTaste('favorites', 'Avocat'))
+    await act(() => result.current.addTaste('favorites', 'Kiwi'))
     await act(async () => {
       failFirst(new Error('quota'))
     })
-    act(() => result.current.addTaste('favorites', 'Mangue'))
+    await act(() => result.current.addTaste('favorites', 'Mangue'))
 
     expect(written().favorites).toEqual(['Saumon', 'Avocat', 'Kiwi', 'Mangue'])
+  })
+
+  it("rend false et retire le goût affiché quand l'écriture échoue", async () => {
+    // Sinon la feuille se referme comme si de rien n'était et le goût disparaît
+    // au prochain chargement.
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    set.mockRejectedValue(new Error('quota'))
+    const { result } = renderHook(() => useProfile())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+
+    let accepted = true
+    await act(async () => {
+      accepted = await result.current.addTaste('favorites', 'Avocat')
+    })
+
+    expect(accepted).toBe(false)
+    expect(result.current.profile.favorites).toEqual(stored.favorites)
   })
 
   it('renvoie true quand le goût est pris en compte', async () => {
@@ -199,9 +216,9 @@ describe('useProfile.addTaste', () => {
 
     let added = false
     let duplicate = false
-    act(() => {
-      added = result.current.addTaste('favorites', 'Avocat')
-      duplicate = result.current.addTaste('favorites', 'Saumon')
+    await act(async () => {
+      added = await result.current.addTaste('favorites', 'Avocat')
+      duplicate = await result.current.addTaste('favorites', 'Saumon')
     })
 
     expect(added).toBe(true)
@@ -214,7 +231,7 @@ describe('useProfile.addTaste', () => {
     const { result } = renderHook(() => useProfile())
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
-    act(() => result.current.addTaste('favorites', 'Avocat'))
+    await act(() => result.current.addTaste('favorites', 'Avocat'))
 
     await waitFor(() => expect(result.current.saveState).toBe('error'))
   })
@@ -223,7 +240,7 @@ describe('useProfile.addTaste', () => {
     const { result } = renderHook(() => useProfile())
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
-    act(() => result.current.addTaste('favorites', '  Avocat '))
+    await act(() => result.current.addTaste('favorites', '  Avocat '))
 
     expect(result.current.profile.favorites).toEqual(['Saumon', 'Avocat'])
     expect(written().favorites).toEqual(['Saumon', 'Avocat'])
@@ -236,8 +253,8 @@ describe('useProfile.addTaste', () => {
     const { result } = renderHook(() => useProfile())
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
-    act(() => result.current.addTaste('favorites', 'Avocat'))
-    act(() => result.current.addTaste('dislikes', 'Céleri'))
+    act(() => void result.current.addTaste('favorites', 'Avocat'))
+    await act(() => result.current.addTaste('dislikes', 'Céleri'))
     await waitFor(() => expect(result.current.saveState).toBe('saved'))
 
     await act(async () => {
