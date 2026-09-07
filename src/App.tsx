@@ -1,11 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { AppHeader } from './components/AppHeader'
 import { BottomNav } from './components/BottomNav'
 import { ChatBar } from './components/ChatBar'
 import { CoachSheet } from './components/chat/CoachSheet'
 import { dashboardData } from './data/dashboard'
 import { NAV_ITEMS } from './lib/navigation'
-import { todayKey } from './lib/day'
+import { isPast, isToday, shiftDay, todayKey } from './lib/day'
 import { purgeExpired } from './lib/retention'
 import { useActivities } from './hooks/useActivities'
 import { useAiSettings } from './hooks/useAiSettings'
@@ -29,6 +29,25 @@ export default function App() {
     void purgeExpired()
   }, [])
 
+  const [day, setDay] = useState(todayKey())
+
+  // Une session laissée ouverte la nuit afficherait hier en le nommant
+  // « aujourd'hui » : au retour au premier plan, la sélection suit le jour réel
+  // si elle portait sur le jour qui vient de passer.
+  useEffect(() => {
+    function follow() {
+      if (document.visibilityState !== 'visible') return
+      setDay((current) =>
+        current < todayKey() && current === shiftDay(todayKey(), -1) ? todayKey() : current,
+      )
+    }
+    document.addEventListener('visibilitychange', follow)
+    return () => document.removeEventListener('visibilitychange', follow)
+  }, [])
+
+  const past = isPast(day)
+  const editable = !past
+
   const route = useHashRoute('dashboard')
   const navItem = NAV_ITEMS.find((item) => item.route === route)
   // Le coach est ouvert par-dessus le dashboard : la barre de chat n'est donc
@@ -49,15 +68,15 @@ export default function App() {
   const scheduleStore = useSchedule(settings, models)
   // Le planning alimente la journée : les habitudes du jour sont proposées
   // dans la chronologie, à confirmer une par une.
-  const activityStore = useActivities(scheduleStore.schedule, scheduleStore.loaded, todayKey(), true)
+  const activityStore = useActivities(scheduleStore.schedule, scheduleStore.loaded, day, isToday(day))
   const dailyMenu = useDailyMenu(
     settings,
     profile,
     profileStore.loaded,
     activityStore.activities,
     models,
-    todayKey(),
-    true,
+    day,
+    editable,
   )
   const online = useOnline()
   const { messages, state, error, send, stop, clear } = useCoachChat(
@@ -66,8 +85,8 @@ export default function App() {
     activityStore.activities,
     dailyMenu.menu,
     models,
-    todayKey(),
-    true,
+    day,
+    editable,
   )
 
   const configured = isConfigured(settings)
@@ -107,7 +126,10 @@ export default function App() {
             activities={activityStore}
             configured={configured}
             dailyMenu={dailyMenu}
+            day={day}
+            onDayChange={setDay}
             profile={profile}
+            readOnly={past}
           />
         )}
       </main>
@@ -116,6 +138,7 @@ export default function App() {
         <CoachSheet
           coachName={dashboardData.coach.name}
           configured={configured}
+          day={day}
           error={error}
           messages={messages}
           hasMenu={dailyMenu.menu !== null}
@@ -127,6 +150,7 @@ export default function App() {
           onStop={stop}
           online={online}
           reviseError={dailyMenu.reviseError}
+          readOnly={past}
           reviseNotice={dailyMenu.reviseNotice}
           revising={dailyMenu.reviseState === 'revising'}
           streaming={state === 'streaming'}
@@ -136,7 +160,7 @@ export default function App() {
       {showChat && !isCoach && (
         <ChatBar
           coachName={dashboardData.coach.name}
-          disabled={!configured || !online}
+          disabled={!configured || !online || past}
           onSend={handleSend}
         />
       )}

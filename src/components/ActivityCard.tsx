@@ -12,9 +12,17 @@ interface ActivityCardProps {
   weightKg: number
   onRemove: (activityId: string) => void
   onConfirm: (activityId: string) => void
+  /** Vrai hors du jour même : une séance non faite ne se confirme pas. */
+  readOnly?: boolean
 }
 
-export function ActivityCard({ activity, weightKg, onRemove, onConfirm }: ActivityCardProps) {
+export function ActivityCard({
+  activity,
+  weightKg,
+  onRemove,
+  onConfirm,
+  readOnly = false,
+}: ActivityCardProps) {
   const type = findActivityType(activity.typeId)
   const calories = estimateCalories(type.met, weightKg, activity.durationMin)
   // Les déplacements se distinguent des séances par la couleur secondaire.
@@ -71,14 +79,16 @@ export function ActivityCard({ activity, weightKg, onRemove, onConfirm }: Activi
           >
             {activity.durationMin} min
           </span>
-          <button
-            aria-label={`${planned ? 'Écarter' : 'Supprimer'} ${activity.title || type.label}`}
-            className="flex items-center justify-center text-on-surface-variant hover:opacity-75"
-            onClick={() => onRemove(activity.id)}
-            type="button"
-          >
-            <Icon className="text-body-md" name="close" />
-          </button>
+          {!readOnly && (
+            <button
+              aria-label={`${planned ? 'Écarter' : 'Supprimer'} ${activity.title || type.label}`}
+              className="flex items-center justify-center text-on-surface-variant hover:opacity-75"
+              onClick={() => onRemove(activity.id)}
+              type="button"
+            >
+              <Icon className="text-body-md" name="close" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -101,7 +111,7 @@ export function ActivityCard({ activity, weightKg, onRemove, onConfirm }: Activi
         </div>
       </dl>
 
-      {planned && (
+      {planned && !readOnly && (
         <button
           className="flex items-center justify-center gap-xs rounded-full bg-primary-container px-sm py-xs font-label-md text-caption font-bold text-on-primary-container transition-colors hover:bg-primary-container/80 active:scale-95"
           onClick={() => onConfirm(activity.id)}

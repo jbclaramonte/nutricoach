@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ActivityCard } from '../components/ActivityCard'
 import { AddActivityForm } from '../components/AddActivityForm'
+import { DaySelector } from '../components/DaySelector'
 import { Icon } from '../components/Icon'
 import { MacroGrid } from '../components/MacroGrid'
 import { MealCard } from '../components/MealCard'
@@ -9,6 +10,7 @@ import { dashboardData } from '../data/dashboard'
 import type { UseActivitiesResult } from '../hooks/useActivities'
 import type { UseDailyMenuResult } from '../hooks/useDailyMenu'
 import { toMacroRings } from '../lib/ai/menuMap'
+import { isToday } from '../lib/day'
 import { dailyTarget } from '../lib/energy'
 import { buildTimeline } from '../lib/timeline'
 import type { Profile } from '../lib/profile'
@@ -19,6 +21,11 @@ interface DashboardScreenProps {
   dailyMenu: UseDailyMenuResult
   /** Vrai quand une clé et un modèle sont enregistrés. */
   configured: boolean
+  /** Jour affiché, au format AAAA-MM-JJ. */
+  day: string
+  onDayChange: (day: string) => void
+  /** Vrai pour un jour révolu : la journée se consulte, ne se modifie pas. */
+  readOnly: boolean
 }
 
 export function DashboardScreen({
@@ -26,16 +33,32 @@ export function DashboardScreen({
   activities: activityStore,
   dailyMenu,
   configured,
+  day,
+  onDayChange,
+  readOnly,
 }: DashboardScreenProps) {
   const { activities, add, remove, confirm } = activityStore
   const { menu, meals, state, error, dropped, generate, toggleEaten } = dailyMenu
   const [adding, setAdding] = useState(false)
+
+  // Confirmer une séance ou cocher un repas ne se fait que le jour même :
+  // demain, rien n'a encore eu lieu.
+  const live = isToday(day)
 
   const timeline = buildTimeline(meals, activities)
   const macros = toMacroRings(meals, dailyTarget(profile, activities), profile.weightKg)
 
   return (
     <div className="flex w-full flex-col gap-lg px-margin-mobile pb-40 pt-sm">
+      <DaySelector day={day} onChange={onDayChange} />
+
+      {readOnly && (
+        <p className="flex items-center gap-xs rounded-xl bg-surface-container px-md py-sm font-body-md text-caption text-on-surface-variant">
+          <Icon className="text-body-md" name="history" />
+          Journée archivée — consultation seule.
+        </p>
+      )}
+
       {menu && menu.banner.trim().length > 0 && (
         <div className="flex items-start gap-sm rounded-xl bg-primary-container p-md text-on-primary-container shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
           <Icon className="mt-[2px]" name="auto_awesome" />
@@ -62,7 +85,7 @@ export function DashboardScreen({
             <Icon className="text-body-md text-primary" name="timeline" />
             Chronologie &amp; Dépenses
           </h2>
-          {!adding && (
+          {live && !adding && (
             <button
               className="flex items-center gap-xs rounded-full bg-surface-container px-sm py-1 font-label-md text-caption text-primary transition-colors hover:bg-surface-container-high active:scale-95"
               onClick={() => setAdding(true)}
@@ -74,7 +97,7 @@ export function DashboardScreen({
           )}
         </div>
 
-        {adding && (
+        {live && adding && (
           <AddActivityForm
             onAdd={(activity) => {
               add(activity)
@@ -99,7 +122,7 @@ export function DashboardScreen({
           </p>
         )}
 
-        {meals.length === 0 && (
+        {meals.length === 0 && !readOnly && (
           <MenuStateCard
             configured={configured}
             error={error}
@@ -110,13 +133,19 @@ export function DashboardScreen({
 
         {timeline.map((entry) =>
           entry.kind === 'meal' ? (
-            <MealCard key={entry.meal.id} meal={entry.meal} onToggleEaten={toggleEaten} />
+            <MealCard
+              key={entry.meal.id}
+              meal={entry.meal}
+              onToggleEaten={toggleEaten}
+              readOnly={!live}
+            />
           ) : (
             <ActivityCard
               activity={entry.activity}
               key={entry.activity.id}
               onConfirm={confirm}
               onRemove={remove}
+              readOnly={!live}
               weightKg={profile.weightKg}
             />
           ),
