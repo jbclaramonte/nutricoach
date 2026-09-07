@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ActivityCard } from '../components/ActivityCard'
 import { AddActivityForm } from '../components/AddActivityForm'
 import { DaySelector } from '../components/DaySelector'
+import { FoodActionSheet } from '../components/FoodActionSheet'
 import { Icon } from '../components/Icon'
 import { MacroGrid } from '../components/MacroGrid'
 import { MealCard } from '../components/MealCard'
@@ -14,9 +15,18 @@ import { dayLabel, isToday, isTomorrow } from '../lib/day'
 import { dailyTarget } from '../lib/energy'
 import { buildTimeline } from '../lib/timeline'
 import type { Profile } from '../lib/profile'
+import type { FoodItem } from '../types'
+
+/** Aliment touché, avec le repas d'où il vient : les deux nomment la demande. */
+interface PickedFood {
+  item: FoodItem
+  mealLabel: string
+}
 
 interface DashboardScreenProps {
   profile: Profile
+  /** Classe un aliment dans une liste de goûts du profil et l'enregistre. */
+  addTaste: (list: 'favorites' | 'dislikes', food: string) => void
   activities: UseActivitiesResult
   dailyMenu: UseDailyMenuResult
   /** Vrai quand une clé et un modèle sont enregistrés. */
@@ -30,6 +40,7 @@ interface DashboardScreenProps {
 
 export function DashboardScreen({
   profile,
+  addTaste,
   activities: activityStore,
   dailyMenu,
   configured,
@@ -38,9 +49,13 @@ export function DashboardScreen({
   readOnly,
 }: DashboardScreenProps) {
   const { activities, add, remove, confirm } = activityStore
-  const { menu, meals, state, error, dropped, generate, toggleEaten } = dailyMenu
+  const { menu, meals, state, error, dropped, generate, toggleEaten, revise } = dailyMenu
   const [adding, setAdding] = useState(false)
   const [shownDay, setShownDay] = useState(day)
+  const [picked, setPicked] = useState<PickedFood | null>(null)
+  // Le rejet est enregistré dès le geste, mais la feuille reste ouverte pour
+  // proposer le remplacement : c'est à l'utilisateur de trancher.
+  const [replaceOffered, setReplaceOffered] = useState(false)
 
   // Changer de jour referme le formulaire : sa saisie portait sur la journée
   // qu'on vient de quitter. L'ajustement se fait pendant le rendu, pour que le
@@ -48,11 +63,28 @@ export function DashboardScreen({
   if (shownDay !== day) {
     setShownDay(day)
     setAdding(false)
+    setPicked(null)
+    setReplaceOffered(false)
   }
 
   // Confirmer une séance ou cocher un repas ne se fait que le jour même :
   // demain, rien n'a encore eu lieu.
   const live = isToday(day)
+  // Une révision en cours réécrit le menu : agir sur l'aliment affiché
+  // porterait sur un repas déjà remplacé.
+  const revising = dailyMenu.reviseState === 'revising'
+
+  function closeSheet() {
+    setPicked(null)
+    setReplaceOffered(false)
+  }
+
+  function requestReplacement(food: PickedFood) {
+    void revise(
+      `Je n'ai pas de ${food.item.name} pour le ${food.mealLabel}. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.`,
+    )
+    closeSheet()
+  }
 
   const timeline = buildTimeline(meals, activities)
   const macros = toMacroRings(meals, dailyTarget(profile, activities), profile.weightKg)
@@ -143,9 +175,13 @@ export function DashboardScreen({
           entry.kind === 'meal' ? (
             <MealCard
               key={entry.meal.id}
+              busy={revising}
               meal={entry.meal}
-              // Câblage des actions d'aliment à la tâche suivante.
-              onPickFood={() => {}}
+              onPickFood={(item) => {
+                if (!live || revising) return
+                setPicked({ item, mealLabel: entry.meal.slotLabel })
+                setReplaceOffered(false)
+              }}
               onToggleEaten={toggleEaten}
               readOnly={!live}
             />
@@ -161,6 +197,25 @@ export function DashboardScreen({
           ),
         )}
       </div>
+
+      {picked && (
+        <FoodActionSheet
+          food={picked.item}
+          mealLabel={picked.mealLabel}
+          onClose={closeSheet}
+          onDislike={() => {
+            addTaste('dislikes', picked.item.name)
+            setReplaceOffered(true)
+          }}
+          onLike={() => {
+            addTaste('favorites', picked.item.name)
+            closeSheet()
+          }}
+          onMissing={() => requestReplacement(picked)}
+          onReplace={() => requestReplacement(picked)}
+          replaceOffered={replaceOffered}
+        />
+      )}
     </div>
   )
 }

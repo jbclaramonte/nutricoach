@@ -38,8 +38,11 @@ const activities: UseActivitiesResult = {
   confirm: vi.fn(),
 }
 
+const addTaste = vi.fn()
+const revise = vi.fn()
+
 /** Menu du jour au repos ; `meals` vide fait apparaître la carte de génération. */
-function menuStore(meals: Meal[], error = ''): UseDailyMenuResult {
+function menuStore(meals: Meal[], error = '', revising = false): UseDailyMenuResult {
   return {
     menu: null,
     meals,
@@ -49,19 +52,20 @@ function menuStore(meals: Meal[], error = ''): UseDailyMenuResult {
     generatedAt: null,
     generate: vi.fn(),
     toggleEaten: vi.fn(),
-    revise: vi.fn(),
-    reviseState: 'idle',
+    revise,
+    reviseState: revising ? 'revising' : 'idle',
     reviseError: '',
     reviseNotice: '',
   }
 }
 
-function screenOf(day: string, meals: Meal[] = [meal], error = '') {
+function screenOf(day: string, meals: Meal[] = [meal], error = '', revising = false) {
   return (
     <DashboardScreen
       activities={activities}
+      addTaste={addTaste}
       configured
-      dailyMenu={menuStore(meals, error)}
+      dailyMenu={menuStore(meals, error, revising)}
       day={day}
       onDayChange={vi.fn()}
       profile={DEFAULT_PROFILE}
@@ -70,11 +74,19 @@ function screenOf(day: string, meals: Meal[] = [meal], error = '') {
   )
 }
 
-function renderDay(day: string, meals: Meal[] = [meal], error = '') {
-  render(screenOf(day, meals, error))
+function renderDay(day: string, meals: Meal[] = [meal], error = '', revising = false) {
+  render(screenOf(day, meals, error, revising))
 }
 
-afterEach(cleanup)
+/** Ouvre la feuille d'actions sur le saumon du déjeuner. */
+function openSheet() {
+  fireEvent.click(screen.getByLabelText('Actions pour Saumon'))
+}
+
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+})
 
 describe('DashboardScreen', () => {
   it('borne le sélecteur à demain', () => {
@@ -143,5 +155,65 @@ describe('DashboardScreen', () => {
     expect(screen.getByLabelText('Marquer Déjeuner comme pris')).toBeTruthy()
     expect(screen.getByText('Intercaler une activité')).toBeTruthy()
     expect(screen.getByText('Confirmer')).toBeTruthy()
+  })
+
+  it("ouvre la feuille d'actions sur l'aliment touché", () => {
+    renderDay(todayKey())
+    openSheet()
+
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByText('120 g — Déjeuner')).toBeTruthy()
+  })
+
+  it("enregistre un aliment apprécié puis referme la feuille", () => {
+    renderDay(todayKey())
+    openSheet()
+    fireEvent.click(screen.getByText("J'aime"))
+
+    expect(addTaste).toHaveBeenCalledWith('favorites', 'Saumon')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it("enregistre un rejet et propose le remplacement sans refermer", () => {
+    renderDay(todayKey())
+    openSheet()
+    fireEvent.click(screen.getByText("Je n'aime pas"))
+
+    expect(addTaste).toHaveBeenCalledWith('dislikes', 'Saumon')
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByText('Le remplacer maintenant')).toBeTruthy()
+    expect(revise).not.toHaveBeenCalled()
+  })
+
+  it("demande le remplacement d'un aliment manquant", () => {
+    renderDay(todayKey())
+    openSheet()
+    fireEvent.click(screen.getByText("Je n'en ai pas"))
+
+    expect(revise).toHaveBeenCalledWith(
+      "Je n'ai pas de Saumon pour le Déjeuner. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.",
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it("demande le remplacement depuis la proposition qui suit un rejet", () => {
+    renderDay(todayKey())
+    openSheet()
+    fireEvent.click(screen.getByText("Je n'aime pas"))
+    fireEvent.click(screen.getByText('Le remplacer maintenant'))
+
+    expect(revise).toHaveBeenCalledWith(
+      "Je n'ai pas de Saumon pour le Déjeuner. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.",
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it("n'ouvre la feuille ni pendant une révision ni sur un jour passé", () => {
+    renderDay(todayKey(), [meal], '', true)
+    expect(screen.queryByLabelText('Actions pour Saumon')).toBeNull()
+
+    cleanup()
+    renderDay(yesterday)
+    expect(screen.queryByLabelText('Actions pour Saumon')).toBeNull()
   })
 })

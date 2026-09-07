@@ -110,6 +110,7 @@ export default function App() {
         ) : (
           <DashboardScreen
             activities={activityStore}
+            addTaste={profileStore.addTaste}
             configured={configured}
             dailyMenu={dailyMenu}
             day={day}
