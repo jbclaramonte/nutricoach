@@ -25,8 +25,10 @@ interface PickedFood {
 
 interface DashboardScreenProps {
   profile: Profile
-  /** Classe un aliment dans une liste de goûts du profil ; faux si rien n'a pu être enregistré. */
-  addTaste: (list: 'favorites' | 'dislikes', food: string) => boolean
+  /** Classe un aliment dans une liste de goûts du profil ; faux si rien n'a été enregistré. */
+  addTaste: (list: 'favorites' | 'dislikes', food: string) => Promise<boolean>
+  /** Vrai quand la lecture du profil a échoué : plus aucune écriture n'est possible. */
+  profileReadFailed: boolean
   activities: UseActivitiesResult
   dailyMenu: UseDailyMenuResult
   /** Vrai quand une clé et un modèle sont enregistrés. */
@@ -43,6 +45,7 @@ interface DashboardScreenProps {
 export function DashboardScreen({
   profile,
   addTaste,
+  profileReadFailed,
   activities: activityStore,
   dailyMenu,
   configured,
@@ -60,9 +63,9 @@ export function DashboardScreen({
   // proposer le remplacement : c'est à l'utilisateur de trancher.
   const [replaceOffered, setReplaceOffered] = useState(false)
   const [tasteError, setTasteError] = useState('')
-  // Le résultat d'une révision se garde par son texte : un nouveau message
-  // reparaît de lui-même, sans qu'un drapeau ait à être remis à zéro.
-  const [dismissedNotice, setDismissedNotice] = useState('')
+  // Le masquage porte sur l'identifiant de la révision, pas sur son texte : deux
+  // révisions de suite peuvent se résumer par la même phrase.
+  const [dismissedRevision, setDismissedRevision] = useState(0)
 
   // Changer de jour referme le formulaire : sa saisie portait sur la journée
   // qu'on vient de quitter. L'ajustement se fait pendant le rendu, pour que le
@@ -73,6 +76,7 @@ export function DashboardScreen({
     setPicked(null)
     setReplaceOffered(false)
     setTasteError('')
+    setDismissedRevision(0)
   }
 
   // Confirmer une séance ou cocher un repas ne se fait que le jour même :
@@ -92,13 +96,19 @@ export function DashboardScreen({
   }
 
   /** Enchaîne `after` sur un enregistrement réussi, sinon garde la feuille ouverte. */
-  function recordTaste(list: 'favorites' | 'dislikes', food: string, after: () => void) {
-    if (addTaste(list, food)) {
+  async function recordTaste(list: 'favorites' | 'dislikes', food: string, after: () => void) {
+    if (await addTaste(list, food)) {
       setTasteError('')
       after()
       return
     }
-    setTasteError("Votre profil n'a pas pu être lu, ce choix n'a pas été enregistré.")
+    // Un profil illisible et une écriture refusée n'appellent pas le même geste :
+    // le premier ne se retente pas, la seconde si.
+    setTasteError(
+      profileReadFailed
+        ? "Votre profil n'a pas pu être lu, ce choix n'a pas été enregistré."
+        : "Ce choix n'a pas pu être enregistré. Réessayez.",
+    )
   }
 
   function requestReplacement(food: PickedFood) {
@@ -182,14 +192,14 @@ export function DashboardScreen({
         )}
 
         {/* Le volet coach porte déjà ce message : sous lui, il se lirait deux fois. */}
-        {!coachOpen && dailyMenu.reviseNotice && dailyMenu.reviseNotice !== dismissedNotice && (
+        {!coachOpen && dailyMenu.reviseNotice && dailyMenu.reviseId !== dismissedRevision && (
           <p className="flex items-center gap-xs rounded-xl bg-surface-container px-md py-sm font-body-md text-caption text-on-surface-variant">
             <Icon className="text-body-md" name="auto_awesome" />
             <span className="flex-1">{dailyMenu.reviseNotice}</span>
             <button
               aria-label="Masquer le résultat de la révision"
               className="shrink-0 rounded-full p-1 transition-colors active:bg-surface-container-highest"
-              onClick={() => setDismissedNotice(dailyMenu.reviseNotice)}
+              onClick={() => setDismissedRevision(dailyMenu.reviseId)}
               type="button"
             >
               <Icon className="text-body-md" name="close" />
@@ -247,10 +257,12 @@ export function DashboardScreen({
           food={picked.item}
           mealLabel={picked.mealLabel}
           onClose={closeSheet}
-          onDislike={() =>
-            recordTaste('dislikes', picked.item.name, () => setReplaceOffered(true))
-          }
-          onLike={() => recordTaste('favorites', picked.item.name, closeSheet)}
+          onDislike={() => {
+            void recordTaste('dislikes', picked.item.name, () => setReplaceOffered(true))
+          }}
+          onLike={() => {
+            void recordTaste('favorites', picked.item.name, closeSheet)
+          }}
           onMissing={() => requestReplacement(picked)}
           onReplace={() => requestReplacement(picked)}
           replaceOffered={replaceOffered}

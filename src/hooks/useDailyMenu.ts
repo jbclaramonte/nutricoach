@@ -53,6 +53,8 @@ export interface UseDailyMenuResult {
   reviseError: string
   /** Phrase française résumant la dernière révision réussie. */
   reviseNotice: string
+  /** Change à chaque nouveau résultat : deux révisions peuvent le résumer pareil. */
+  reviseId: number
 }
 
 const KEY_PREFIX = 'menu:'
@@ -83,7 +85,14 @@ export function useDailyMenu(
   const [reviseState, setReviseState] = useState<ReviseState>('idle')
   const [reviseError, setReviseError] = useState('')
   const [reviseNotice, setReviseNotice] = useState('')
+  const [reviseId, setReviseId] = useState(0)
   const [shownDay, setShownDay] = useState(day)
+
+  /** Seul point de mise à jour du résultat : l'identifiant ne peut pas se désynchroniser. */
+  function showNotice(text: string) {
+    setReviseNotice(text)
+    setReviseId((previous) => previous + 1)
+  }
   // Miroir synchrone du jour affiché : les appels au modèle durent, et leur
   // réponse doit savoir hors rendu si elle concerne encore le jour à l'écran.
   const dayRef = useRef(day)
@@ -119,7 +128,7 @@ export function useDailyMenu(
     setDropped([])
     setReviseState('idle')
     setReviseError('')
-    setReviseNotice('')
+    showNotice('')
   }
 
   /** Unique point d'écriture du menu : garde le miroir et le magasin à jour. */
@@ -241,7 +250,7 @@ export function useDailyMenu(
         loaded.current = true
         setDropped(parsed.dropped)
         setReviseError('')
-        setReviseNotice('')
+        showNotice('')
         setState('ready')
 
         await applyStored(next)
@@ -320,7 +329,7 @@ export function useDailyMenu(
 
       setReviseState('revising')
       setReviseError('')
-      setReviseNotice('')
+      showNotice('')
 
       const ask = () =>
         complete({
@@ -379,7 +388,7 @@ export function useDailyMenu(
           ...parsed.dropped,
           ...restored.map((slotLabel) => `${slotLabel} (déjà pris, laissé inchangé)`),
         ])
-        setReviseNotice(summariseChanges(current.menu, guarded))
+        showNotice(summariseChanges(current.menu, guarded))
         setReviseState('idle')
         setState('ready')
 
@@ -421,5 +430,6 @@ export function useDailyMenu(
     reviseState,
     reviseError,
     reviseNotice: blocked ? '' : reviseNotice,
+    reviseId,
   }
 }

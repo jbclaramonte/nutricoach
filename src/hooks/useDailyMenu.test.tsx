@@ -76,6 +76,25 @@ describe('useDailyMenu', () => {
     expect(set).not.toHaveBeenCalled()
   })
 
+  it('change d\'identifiant à chaque révision, même résumée pareil', async () => {
+    get.mockResolvedValue(storedMenu("Aujourd'hui"))
+    const { result } = render(todayKey(), true)
+    await waitFor(() => expect(result.current.menu).not.toBeNull())
+
+    await act(async () => {
+      await result.current.revise('plus de légumes')
+    })
+    const first = result.current.reviseId
+    expect(result.current.reviseNotice).not.toBe('')
+
+    await act(async () => {
+      await result.current.revise('plus de légumes')
+    })
+
+    expect(result.current.reviseNotice).not.toBe('')
+    expect(result.current.reviseId).not.toBe(first)
+  })
+
   it('ne coche pas un repas hors du jour vécu', async () => {
     get.mockResolvedValue(storedMenu('Demain'))
     // Le jour à venir est éditable — on y génère son menu — mais un repas

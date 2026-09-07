@@ -112,6 +112,7 @@ export default function App() {
             activities={activityStore}
             addTaste={profileStore.addTaste}
             coachOpen={isCoach}
+            profileReadFailed={profileStore.readFailed}
             configured={configured}
             dailyMenu={dailyMenu}
             day={day}

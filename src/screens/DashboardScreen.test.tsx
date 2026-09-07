@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { UseActivitiesResult } from '../hooks/useActivities'
 import type { UseDailyMenuResult } from '../hooks/useDailyMenu'
@@ -38,7 +38,7 @@ const activities: UseActivitiesResult = {
   confirm: vi.fn(),
 }
 
-const addTaste = vi.fn(() => true)
+const addTaste = vi.fn(() => Promise.resolve(true))
 const revise = vi.fn()
 
 /** État de révision du menu, à part : la plupart des tests le laissent au repos. */
@@ -46,6 +46,7 @@ interface Revision {
   revising?: boolean
   reviseError?: string
   reviseNotice?: string
+  reviseId?: number
 }
 
 /** Menu du jour au repos ; `meals` vide fait apparaître la carte de génération. */
@@ -63,6 +64,7 @@ function menuStore(meals: Meal[], error = '', revision: Revision = {}): UseDaily
     reviseState: revision.revising ? 'revising' : 'idle',
     reviseError: revision.reviseError ?? '',
     reviseNotice: revision.reviseNotice ?? '',
+    reviseId: revision.reviseId ?? 1,
   }
 }
 
@@ -72,6 +74,7 @@ function screenOf(day: string, meals: Meal[] = [meal], error = '', revision: Rev
       activities={activities}
       addTaste={addTaste}
       coachOpen={false}
+      profileReadFailed={false}
       configured
       dailyMenu={menuStore(meals, error, revision)}
       day={day}
@@ -94,7 +97,7 @@ function openSheet() {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
-  addTaste.mockReturnValue(true)
+  addTaste.mockResolvedValue(true)
 })
 
 describe('DashboardScreen', () => {
@@ -174,23 +177,23 @@ describe('DashboardScreen', () => {
     expect(screen.getByText('120 g — Déjeuner')).toBeTruthy()
   })
 
-  it("enregistre un aliment apprécié puis referme la feuille", () => {
+  it("enregistre un aliment apprécié puis referme la feuille", async () => {
     renderDay(todayKey())
     openSheet()
     fireEvent.click(screen.getByText("J'aime"))
 
     expect(addTaste).toHaveBeenCalledWith('favorites', 'Saumon')
-    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
-  it("enregistre un rejet et propose le remplacement sans refermer", () => {
+  it("enregistre un rejet et propose le remplacement sans refermer", async () => {
     renderDay(todayKey())
     openSheet()
     fireEvent.click(screen.getByText("Je n'aime pas"))
 
     expect(addTaste).toHaveBeenCalledWith('dislikes', 'Saumon')
+    expect(await screen.findByText('Le remplacer maintenant')).toBeTruthy()
     expect(screen.getByRole('dialog')).toBeTruthy()
-    expect(screen.getByText('Le remplacer maintenant')).toBeTruthy()
     expect(revise).not.toHaveBeenCalled()
   })
 
@@ -205,11 +208,11 @@ describe('DashboardScreen', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it("demande le remplacement depuis la proposition qui suit un rejet", () => {
+  it("demande le remplacement depuis la proposition qui suit un rejet", async () => {
     renderDay(todayKey())
     openSheet()
     fireEvent.click(screen.getByText("Je n'aime pas"))
-    fireEvent.click(screen.getByText('Le remplacer maintenant'))
+    fireEvent.click(await screen.findByText('Le remplacer maintenant'))
 
     expect(revise).toHaveBeenCalledWith(
       "Je n'ai pas de Saumon pour le Déjeuner. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.",
@@ -248,27 +251,72 @@ describe('DashboardScreen', () => {
     )
   })
 
-  it("garde la feuille ouverte quand le goût n'a pas pu être enregistré", () => {
-    addTaste.mockReturnValue(false)
+  it("garde la feuille ouverte quand l'écriture du goût est refusée", async () => {
+    addTaste.mockResolvedValue(false)
     renderDay(todayKey())
     openSheet()
     fireEvent.click(screen.getByText("J'aime"))
 
+    expect(await screen.findByText("Ce choix n'a pas pu être enregistré. Réessayez.")).toBeTruthy()
     expect(screen.getByRole('dialog')).toBeTruthy()
-    expect(
-      screen.getByText("Votre profil n'a pas pu être lu, ce choix n'a pas été enregistré."),
-    ).toBeTruthy()
 
     fireEvent.click(screen.getByText("Je n'aime pas"))
+    await waitFor(() => expect(addTaste).toHaveBeenCalledTimes(2))
     expect(screen.queryByText('Le remplacer maintenant')).toBeNull()
   })
 
+  it("distingue un profil illisible d'une écriture refusée", async () => {
+    addTaste.mockResolvedValue(false)
+    render(
+      <DashboardScreen
+        activities={activities}
+        addTaste={addTaste}
+        coachOpen={false}
+        configured
+        dailyMenu={menuStore([meal])}
+        day={todayKey()}
+        onDayChange={vi.fn()}
+        profile={DEFAULT_PROFILE}
+        profileReadFailed
+        readOnly={false}
+      />,
+    )
+    openSheet()
+    fireEvent.click(screen.getByText("J'aime"))
+
+    expect(
+      await screen.findByText("Votre profil n'a pas pu être lu, ce choix n'a pas été enregistré."),
+    ).toBeTruthy()
+  })
+
   it('masque le résultat de la révision sur demande', () => {
-    renderDay(todayKey(), [meal], '', { reviseNotice: 'Déjeuner remplacé.' })
+    renderDay(todayKey(), [meal], '', { reviseNotice: 'Déjeuner remplacé.', reviseId: 3 })
 
     fireEvent.click(screen.getByLabelText('Masquer le résultat de la révision'))
 
     expect(screen.queryByText('Déjeuner remplacé.')).toBeNull()
+  })
+
+  it('réaffiche une révision suivante résumée par la même phrase', () => {
+    const notice = 'Menu mis à jour — déjeuner recomposé.'
+    const { rerender } = render(screenOf(todayKey(), [meal], '', { reviseNotice: notice, reviseId: 3 }))
+    fireEvent.click(screen.getByLabelText('Masquer le résultat de la révision'))
+    expect(screen.queryByText(notice)).toBeNull()
+
+    rerender(screenOf(todayKey(), [meal], '', { reviseNotice: notice, reviseId: 4 }))
+
+    expect(screen.getByText(notice)).toBeTruthy()
+  })
+
+  it('oublie le masquage du résultat au changement de jour', () => {
+    const notice = 'Menu mis à jour — déjeuner recomposé.'
+    const { rerender } = render(screenOf(todayKey(), [meal], '', { reviseNotice: notice, reviseId: 3 }))
+    fireEvent.click(screen.getByLabelText('Masquer le résultat de la révision'))
+
+    rerender(screenOf(tomorrow, [meal], '', { reviseNotice: notice, reviseId: 3 }))
+    rerender(screenOf(todayKey(), [meal], '', { reviseNotice: notice, reviseId: 3 }))
+
+    expect(screen.getByText(notice)).toBeTruthy()
   })
 
   it('laisse le résultat de la révision au volet coach quand il est ouvert', () => {
@@ -282,6 +330,7 @@ describe('DashboardScreen', () => {
         day={todayKey()}
         onDayChange={vi.fn()}
         profile={DEFAULT_PROFILE}
+        profileReadFailed={false}
         readOnly={false}
       />,
     )
