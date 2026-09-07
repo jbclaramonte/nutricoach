@@ -13,13 +13,24 @@ export function todayKey(): string {
 }
 
 /**
+ * Date correspondant à une clé de jour, fixée à midi : le planning ne lit que
+ * le jour de la semaine, et midi met la journée hors d'atteinte des sauts
+ * d'heure.
+ */
+export function dateOfKey(key: string): Date {
+  const [year, month, day] = key.split('-').map(Number)
+  return new Date(year, month - 1, day, 12)
+}
+
+/**
  * Décale une clé de jour. Le calcul passe par une date fixée à midi : ajouter
  * des millisecondes ferait dériver la journée d'une heure au changement
  * d'heure, et un décalage négatif tomberait la veille.
  */
 export function shiftDay(key: string, days: number): string {
-  const [year, month, day] = key.split('-').map(Number)
-  return dayKey(new Date(year, month - 1, day + days, 12))
+  const shifted = dateOfKey(key)
+  shifted.setDate(shifted.getDate() + days)
+  return dayKey(shifted)
 }
 
 /** Borne basse du calendrier : au-delà, les journées sont purgées. */
@@ -49,6 +60,5 @@ const FULL_DATE = new Intl.DateTimeFormat('fr-FR', {
 export function dayLabel(key: string): string {
   if (isToday(key)) return "Aujourd'hui"
   if (isTomorrow(key)) return 'Demain'
-  const [year, month, day] = key.split('-').map(Number)
-  return FULL_DATE.format(new Date(year, month - 1, day, 12))
+  return FULL_DATE.format(dateOfKey(key))
 }

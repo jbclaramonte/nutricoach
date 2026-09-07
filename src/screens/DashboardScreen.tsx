@@ -10,7 +10,7 @@ import { dashboardData } from '../data/dashboard'
 import type { UseActivitiesResult } from '../hooks/useActivities'
 import type { UseDailyMenuResult } from '../hooks/useDailyMenu'
 import { toMacroRings } from '../lib/ai/menuMap'
-import { dayLabel, isToday } from '../lib/day'
+import { dayLabel, isToday, isTomorrow } from '../lib/day'
 import { dailyTarget } from '../lib/energy'
 import { buildTimeline } from '../lib/timeline'
 import type { Profile } from '../lib/profile'
@@ -131,9 +131,11 @@ export function DashboardScreen({
         {meals.length === 0 && !readOnly && (
           <MenuStateCard
             configured={configured}
+            dayLabel={dayLabel(day)}
             error={error}
             onGenerate={generate}
             state={state === 'loading' ? 'loading' : state === 'error' ? 'error' : 'idle'}
+            tomorrow={isTomorrow(day)}
           />
         )}
 

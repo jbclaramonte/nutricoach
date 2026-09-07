@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Activity } from '../lib/activities'
-import { isToday } from '../lib/day'
-import { dateOfKey } from '../lib/dayActivities'
+import { dateOfKey, isToday } from '../lib/day'
 import { dbDelete, dbGet, dbSet } from '../lib/db'
 import { plannedActivitiesFor, type RecurringActivity } from '../lib/schedule'
 import { defaultActivities } from '../data/dashboard'

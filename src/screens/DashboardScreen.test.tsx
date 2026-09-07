@@ -104,7 +104,8 @@ describe('DashboardScreen', () => {
   it('permet la génération de demain sans proposer les coches de repas', () => {
     renderDay(tomorrow, [])
 
-    expect(screen.getByText('Générer mon menu')).toBeTruthy()
+    expect(screen.getByText('Générer le menu de demain')).toBeTruthy()
+    expect(screen.getByText(/Aucun menu pour demain/)).toBeTruthy()
     expect(screen.queryByText(/Journée archivée/)).toBeNull()
 
     cleanup()

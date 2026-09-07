@@ -60,4 +60,16 @@ describe('CoachSheet', () => {
     expect(screen.queryByText('Appliquer au menu')).toBeNull()
     expect(screen.queryByLabelText('Effacer la conversation')).toBeNull()
   })
+
+  it('dit pourquoi la saisie est morte sur un jour passé', () => {
+    renderSheet(yesterday, true)
+
+    expect(screen.getByText(/Journée archivée — consultation seule\./)).toBeTruthy()
+  })
+
+  it("ne dit rien de tel sur la journée en cours", () => {
+    renderSheet(todayKey(), false)
+
+    expect(screen.queryByText(/Journée archivée/)).toBeNull()
+  })
 })

@@ -99,11 +99,20 @@ export function useDailyMenu(
   // menu de la veille sous la clé du nouveau jour.
   if (shownDay !== day) {
     setShownDay(day)
+    // Écriture d'un miroir, idempotente et dérivée de la seule prop `day`, dans
+    // le bloc d'ajustement d'état pendant le rendu : rien n'en dépend à
+    // l'affichage, seuls les appels différés la relisent.
+    // oxlint-disable-next-line react/refs
     dayRef.current = day
     setStored(null)
+    // Même nature : le miroir est remis à la même valeur vide que l'état, sûr
+    // à rejouer si le rendu l'est, et seuls les appels différés le relisent.
+    // oxlint-disable-next-line react/refs
     storedRef.current = null
     // Le menu du jour précédent ne fait plus autorité : celui du nouveau jour
-    // doit pouvoir être relu du magasin.
+    // doit pouvoir être relu du magasin. Valeur constante, réécrite à
+    // l'identique si le rendu est rejoué.
+    // oxlint-disable-next-line react/refs
     loaded.current = false
     setState('idle')
     setError('')

@@ -269,6 +269,13 @@ export function CoachSheet({
             </button>
           )}
 
+          {readOnly && (
+            <p className="flex items-center gap-xs rounded-xl bg-surface-container p-sm font-body-md text-caption text-on-surface-variant">
+              <Icon className="text-body-md" name="history" />
+              Journée archivée — consultation seule.
+            </p>
+          )}
+
           <div ref={bottom} />
         </div>
 
