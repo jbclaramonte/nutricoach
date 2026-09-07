@@ -95,4 +95,47 @@ describe('useProfile.addTaste', () => {
 
     await waitFor(() => expect(result.current.saveState).toBe('error'))
   })
+
+  it("stocke l'aliment sans ses espaces de bord", async () => {
+    const { result } = renderHook(() => useProfile())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+
+    act(() => result.current.addTaste('favorites', '  Avocat '))
+
+    expect(result.current.profile.favorites).toEqual(['Saumon', 'Avocat'])
+    expect(written().favorites).toEqual(['Saumon', 'Avocat'])
+  })
+
+  it("n'affiche pas d'erreur quand une écriture doublée échoue après la bonne", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    let failFirst: (reason: Error) => void = () => {}
+    set.mockImplementationOnce(() => new Promise((_, reject) => (failFirst = reject)))
+    const { result } = renderHook(() => useProfile())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+
+    act(() => result.current.addTaste('favorites', 'Avocat'))
+    act(() => result.current.addTaste('dislikes', 'Céleri'))
+    await waitFor(() => expect(result.current.saveState).toBe('saved'))
+
+    await act(async () => {
+      failFirst(new Error('quota'))
+    })
+    expect(result.current.saveState).toBe('saved')
+  })
+})
+
+describe('useProfile.save', () => {
+  it('écrit les deux modifications enchaînées avant la sauvegarde', async () => {
+    const { result } = renderHook(() => useProfile())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+
+    act(() => {
+      result.current.update({ age: 31 })
+      result.current.update({ weightKg: 70 })
+      result.current.save()
+    })
+
+    expect(written().age).toBe(31)
+    expect(written().weightKg).toBe(70)
+  })
 })

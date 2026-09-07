@@ -32,6 +32,7 @@ export function useProfile(): UseProfileResult {
   // dans le même geste, où `profile` serait celui capturé au rendu.
   const profileRef = useRef<Profile>(DEFAULT_PROFILE)
   const loadedRef = useRef(false)
+  const writeGeneration = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -58,23 +59,31 @@ export function useProfile(): UseProfileResult {
   }, [])
 
   function update(patch: Partial<Profile>) {
-    setProfile((current) => {
-      const next = { ...current, ...patch }
-      profileRef.current = next
-      return next
-    })
+    // Le miroir est la source de vérité : l'updater de setProfile ne s'évalue
+    // pas toujours tout de suite, et deux update() de suite perdraient le
+    // premier patch avant l'enregistrement.
+    const next = { ...profileRef.current, ...patch }
+    profileRef.current = next
+    setProfile(next)
   }
 
   /** Unique point d'écriture du profil : porte aussi le cycle de saveState. */
   function persist(next: Profile) {
+    const generation = ++writeGeneration.current
+    // Une écriture doublée par une plus récente ne dit plus rien de l'état
+    // enregistré : son échec afficherait « Erreur » sur un profil bien écrit.
+    const stale = () => writeGeneration.current !== generation
     setSaveState('saving')
     dbSet(KEY, next)
-      .then(() => setSaveState('saved'))
+      .then(() => {
+        if (!stale()) setSaveState('saved')
+      })
       .catch((error) => {
         console.error('[profile] écriture impossible', error)
-        setSaveState('error')
+        if (!stale()) setSaveState('error')
       })
       .finally(() => {
+        if (stale()) return
         window.clearTimeout(resetTimer.current)
         resetTimer.current = window.setTimeout(() => setSaveState('idle'), 2500)
       })
@@ -88,14 +97,17 @@ export function useProfile(): UseProfileResult {
     // Écrire avant la fin de la lecture initiale écraserait le profil
     // enregistré par les valeurs par défaut.
     if (!loadedRef.current) return
+    // Les espaces de bord se retrouveraient dans la puce d'interface et dans le
+    // prompt du coach.
+    const value = food.trim()
     const current = profileRef.current
-    if (current[list].some((entry) => sameFood(entry, food))) return
+    if (current[list].some((entry) => sameFood(entry, value))) return
     // Un aliment ne peut pas être à la fois apprécié et rejeté.
     const other = list === 'favorites' ? 'dislikes' : 'favorites'
     const next: Profile = {
       ...current,
-      [list]: [...current[list], food],
-      [other]: current[other].filter((entry) => !sameFood(entry, food)),
+      [list]: [...current[list], value],
+      [other]: current[other].filter((entry) => !sameFood(entry, value)),
     }
     profileRef.current = next
     setProfile(next)
