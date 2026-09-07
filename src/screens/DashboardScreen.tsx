@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ActivityCard } from '../components/ActivityCard'
 import { AddActivityForm } from '../components/AddActivityForm'
 import { DaySelector } from '../components/DaySelector'
@@ -66,6 +66,11 @@ export function DashboardScreen({
   // Le masquage porte sur l'identifiant de la révision, pas sur son texte : deux
   // révisions de suite peuvent se résumer par la même phrase.
   const [dismissedRevision, setDismissedRevision] = useState(0)
+  // Identité de la feuille ouverte : une écriture lente peut se résoudre alors
+  // que la feuille a été refermée puis rouverte sur un autre aliment. Refermer
+  // seul ne compte pas : il ne reste alors rien à l'écran sur quoi agir, et la
+  // réouverture remet de toute façon la feuille à neuf.
+  const sheetGeneration = useRef(0)
 
   // Changer de jour referme le formulaire : sa saisie portait sur la journée
   // qu'on vient de quitter. L'ajustement se fait pendant le rendu, pour que le
@@ -95,9 +100,21 @@ export function DashboardScreen({
     setTasteError('')
   }
 
+  function openSheet(item: FoodItem, mealLabel: string) {
+    sheetGeneration.current += 1
+    setPicked({ item, mealLabel })
+    setReplaceOffered(false)
+    setTasteError('')
+  }
+
   /** Enchaîne `after` sur un enregistrement réussi, sinon garde la feuille ouverte. */
   async function recordTaste(list: 'favorites' | 'dislikes', food: string, after: () => void) {
-    if (await addTaste(list, food)) {
+    const generation = sheetGeneration.current
+    const saved = await addTaste(list, food)
+    // La feuille du geste n'est plus à l'écran : sa suite porterait sur un
+    // aliment que l'utilisateur n'a pas jugé.
+    if (sheetGeneration.current !== generation) return
+    if (saved) {
       setTasteError('')
       after()
       return
@@ -233,10 +250,7 @@ export function DashboardScreen({
               canCheckEaten={live}
               canPickFood={foodActions}
               meal={entry.meal}
-              onPickFood={(item) => {
-                setPicked({ item, mealLabel: entry.meal.slotLabel })
-                setReplaceOffered(false)
-              }}
+              onPickFood={(item) => openSheet(item, entry.meal.slotLabel)}
               onToggleEaten={toggleEaten}
             />
           ) : (

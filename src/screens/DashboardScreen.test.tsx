@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { UseActivitiesResult } from '../hooks/useActivities'
 import type { UseDailyMenuResult } from '../hooks/useDailyMenu'
@@ -92,6 +92,33 @@ function renderDay(day: string, meals: Meal[] = [meal], error = '', revision: Re
 /** Ouvre la feuille d'actions sur le saumon du déjeuner. */
 function openSheet() {
   fireEvent.click(screen.getByLabelText('Actions pour Saumon'))
+}
+
+/** Déjeuner à deux aliments : de quoi rouvrir la feuille sur un autre. */
+const twoItems: Meal = {
+  ...meal,
+  items: [
+    meal.items[0],
+    { name: 'Lentilles', quantity: '150 g', calories: 180, protein: 12, fiber: 8 },
+  ],
+}
+
+/**
+ * Écriture du goût laissée en vol, pour rouvrir la feuille pendant l'attente.
+ * Rend le déclencheur de sa résolution.
+ */
+function pendingTaste(saved: boolean) {
+  let release = () => {}
+  addTaste.mockReturnValue(
+    new Promise<boolean>((resolve) => {
+      release = () => resolve(saved)
+    }),
+  )
+  return async () => {
+    await act(async () => {
+      release()
+    })
+  }
 }
 
 afterEach(() => {
@@ -336,6 +363,87 @@ describe('DashboardScreen', () => {
     )
 
     expect(screen.queryByText('Déjeuner remplacé.')).toBeNull()
+  })
+
+  it("n'offre pas le remplacement sur la feuille rouverte entre-temps", async () => {
+    const settle = pendingTaste(true)
+    renderDay(todayKey(), [twoItems])
+    openSheet()
+    fireEvent.click(screen.getByText("Je n'aime pas"))
+
+    fireEvent.click(screen.getByText('Annuler'))
+    fireEvent.click(screen.getByLabelText('Actions pour Lentilles'))
+    await settle()
+
+    expect(screen.queryByText('Le remplacer maintenant')).toBeNull()
+    expect(screen.getByText('150 g — Déjeuner')).toBeTruthy()
+  })
+
+  it('ne referme pas la feuille rouverte entre-temps sur un goût apprécié', async () => {
+    const settle = pendingTaste(true)
+    renderDay(todayKey(), [twoItems])
+    openSheet()
+    fireEvent.click(screen.getByText("J'aime"))
+
+    fireEvent.click(screen.getByText('Annuler'))
+    fireEvent.click(screen.getByLabelText('Actions pour Lentilles'))
+    await settle()
+
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByText('150 g — Déjeuner')).toBeTruthy()
+  })
+
+  it("ne porte pas l'échec d'écriture sur la feuille rouverte entre-temps", async () => {
+    const settle = pendingTaste(false)
+    renderDay(todayKey(), [twoItems])
+    openSheet()
+    fireEvent.click(screen.getByText("J'aime"))
+
+    fireEvent.click(screen.getByText('Annuler'))
+    fireEvent.click(screen.getByLabelText('Actions pour Lentilles'))
+    await settle()
+
+    expect(screen.queryByText("Ce choix n'a pas pu être enregistré. Réessayez.")).toBeNull()
+  })
+
+  it("n'emporte pas l'échec d'écriture sur la feuille suivante", async () => {
+    addTaste.mockResolvedValue(false)
+    renderDay(todayKey(), [twoItems])
+    openSheet()
+    fireEvent.click(screen.getByText("J'aime"))
+    expect(await screen.findByText("Ce choix n'a pas pu être enregistré. Réessayez.")).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Annuler'))
+    fireEvent.click(screen.getByLabelText('Actions pour Lentilles'))
+
+    expect(screen.queryByText("Ce choix n'a pas pu être enregistré. Réessayez.")).toBeNull()
+  })
+
+  it("n'ouvre pas une feuille sur l'échec d'une écriture d'un autre jour", async () => {
+    const settle = pendingTaste(false)
+    const { rerender } = render(screenOf(todayKey(), [twoItems]))
+    openSheet()
+    fireEvent.click(screen.getByText("J'aime"))
+
+    // Changer de jour referme la feuille sans que l'écriture soit résolue.
+    rerender(screenOf(tomorrow, [twoItems]))
+    await settle()
+    fireEvent.click(screen.getByLabelText('Actions pour Lentilles'))
+
+    expect(screen.queryByText("Ce choix n'a pas pu être enregistré. Réessayez.")).toBeNull()
+  })
+
+  it("n'ouvre pas une feuille sur le rejet enregistré un autre jour", async () => {
+    const settle = pendingTaste(true)
+    const { rerender } = render(screenOf(todayKey(), [twoItems]))
+    openSheet()
+    fireEvent.click(screen.getByText("Je n'aime pas"))
+
+    rerender(screenOf(tomorrow, [twoItems]))
+    await settle()
+    fireEvent.click(screen.getByLabelText('Actions pour Lentilles'))
+
+    expect(screen.queryByText('Le remplacer maintenant')).toBeNull()
   })
 
   it("affiche le résultat et l'erreur d'une révision", () => {
