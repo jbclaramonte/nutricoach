@@ -1,3 +1,4 @@
+import { parseJsonPayload } from './jsonText'
 import { ACTIVITY_TYPES } from '../activities'
 import { assumedDurationFor, assumedTimeFor, durationFromDistance, mergeRecurring, type RecurringActivity } from '../schedule'
 
@@ -6,16 +7,6 @@ export type ScheduleParseResult =
   | { ok: false; reason: 'not-json' | 'wrong-shape' | 'empty' }
 
 const TIME_PATTERN = /^\d{2}:\d{2}$/
-
-/** Retire l'éventuel bloc de code entourant la réponse du modèle. */
-function stripFences(raw: string): string {
-  const trimmed = raw.trim()
-  if (!trimmed.startsWith('```')) return trimmed
-  return trimmed
-    .replace(/^```[a-zA-Z]*\s*/, '')
-    .replace(/```\s*$/, '')
-    .trim()
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -128,12 +119,8 @@ function describeDropped(value: unknown, index: number): string {
  * jamais : une sortie hors format est une situation nominale, pas un bug.
  */
 export function parseSchedule(raw: string): ScheduleParseResult {
-  let payload: unknown
-  try {
-    payload = JSON.parse(stripFences(raw))
-  } catch {
-    return { ok: false, reason: 'not-json' }
-  }
+  const payload = parseJsonPayload(raw)
+  if (payload === undefined) return { ok: false, reason: 'not-json' }
 
   const list = Array.isArray(payload)
     ? payload

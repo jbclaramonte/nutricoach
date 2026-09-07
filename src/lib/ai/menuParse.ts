@@ -1,4 +1,5 @@
 import type { MealSlot } from '../../types'
+import { parseJsonPayload } from './jsonText'
 import type { GeneratedFood, GeneratedMeal, GeneratedMenu } from './menuSchema'
 
 export type MenuParseResult =
@@ -7,16 +8,6 @@ export type MenuParseResult =
 
 const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack']
 const TIME_PATTERN = /^\d{2}:\d{2}$/
-
-/** Retire l'éventuel bloc de code entourant la réponse du modèle. */
-function stripFences(raw: string): string {
-  const trimmed = raw.trim()
-  if (!trimmed.startsWith('```')) return trimmed
-  return trimmed
-    .replace(/^```[a-zA-Z]*\s*/, '')
-    .replace(/```\s*$/, '')
-    .trim()
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -81,31 +72,9 @@ function describeDropped(value: unknown, index: number): string {
  * Convertit la réponse brute du modèle en menu exploitable. Ne lève jamais :
  * une sortie hors format est une situation nominale, pas un bug.
  */
-/**
- * Extrait l'objet JSON d'une réponse qui l'entoure de prose : sans schéma
- * strict, un modèle préfixe volontiers son menu d'une phrase d'introduction.
- */
-function extractObject(text: string): string | null {
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start === -1 || end <= start) return null
-  return text.slice(start, end + 1)
-}
-
 export function parseMenu(raw: string): MenuParseResult {
-  const cleaned = stripFences(raw)
-  let payload: unknown
-  try {
-    payload = JSON.parse(cleaned)
-  } catch {
-    const inner = extractObject(cleaned)
-    if (inner === null) return { ok: false, reason: 'not-json' }
-    try {
-      payload = JSON.parse(inner)
-    } catch {
-      return { ok: false, reason: 'not-json' }
-    }
-  }
+  const payload = parseJsonPayload(raw)
+  if (payload === undefined) return { ok: false, reason: 'not-json' }
 
   if (!isRecord(payload) || !Array.isArray(payload.meals)) return { ok: false, reason: 'wrong-shape' }
 

@@ -199,7 +199,7 @@ export function useCoachChat(
               [userMessage],
             ),
             temperature: 0.6,
-            maxTokens: 4000,
+            maxTokens: 6000,
             signal: abort.signal,
             onDelta: (delta) => {
               if (stale()) return

@@ -89,7 +89,7 @@ export function useSchedule(settings: AiSettings, models: ORModel[]): UseSchedul
           ],
           jsonSchema,
           temperature: 0.2,
-          maxTokens: 1200,
+          maxTokens: 6000,
         })
 
         const parsed = parseSchedule(raw)
