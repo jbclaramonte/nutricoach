@@ -4,15 +4,6 @@ import type { DashboardData, MealSlot } from '../types'
 const IMG =
   'https://lh3.googleusercontent.com/aida-public/'
 
-/** Libellé de la date du jour, tel qu'affiché et envoyé au modèle. */
-function todayLabel(): string {
-  return new Intl.DateTimeFormat('fr-FR', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'long',
-  }).format(new Date())
-}
-
 /** Décor de l'application : identité, en-tête et micronutriments encore simulés. */
 export const dashboardData: DashboardData = {
   logoUrl: `${IMG}AB6AXuBqwUNKXolRRQWXLXRTBPImrHfPN86lvwQ02fvIFf0nvPdmWUUydkgE-Vqys4UmtBrzfSqmLwKMqlEKHv5C6_4_Qa3VTdf8eDiwUumDus4ORfVA3XsaU65PHS7O4uHmt38dbvIvHSoeMRZMRjiu0J2Uyyn8-WNcgIAMbKshZ2s5eNkkC_QuWS_wGILJsYtP23e34O-ILeQI8PqsmXyqwwmKYjwaS_E65R3XFypNPBTVx-VAsYLVbKM`,
@@ -21,7 +12,6 @@ export const dashboardData: DashboardData = {
     avatarUrl: `${IMG}AB6AXuDlGnlzkQRlIzPgevMoAhnjIkIcB-4TJKDjxnFv1WEX5aEqCSItV9HZcLdWuWThVWm0AAPs1mYH7jdtt5DFY4AzFxeUFbcO1S05xqMOiRF_bCfi9d5lH_yzN_XaXlRUfF5uU8xOkKA7sGVp-99QIDFg6AsFZB8Bw2xSnoNfcFnmH5IiX8E5jfZY8QNNYqDA7H3C4MGytuWT3ARyTuN75lrkGTMyjHuo7lXZ4XdxHROYmrSVPeGxRNE`,
   },
   coach: { name: 'Dr. Anya' },
-  dateLabel: todayLabel(),
   // Aucune table de composition n'est embarquée : ces valeurs restent simulées.
   micros: [
     { key: 'vit-d', label: 'Vit. D', percent: 60 },

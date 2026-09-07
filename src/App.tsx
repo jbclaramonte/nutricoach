@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { AppHeader } from './components/AppHeader'
 import { BottomNav } from './components/BottomNav'
 import { ChatBar } from './components/ChatBar'
 import { CoachSheet } from './components/chat/CoachSheet'
 import { dashboardData } from './data/dashboard'
 import { NAV_ITEMS } from './lib/navigation'
-import { isPast, isToday, shiftDay, todayKey } from './lib/day'
+import { isPast, isToday } from './lib/day'
 import { purgeExpired } from './lib/retention'
 import { useActivities } from './hooks/useActivities'
 import { useAiSettings } from './hooks/useAiSettings'
@@ -16,6 +16,7 @@ import { useModelCatalog } from './hooks/useModelCatalog'
 import { useOnline } from './hooks/useOnline'
 import { useProfile } from './hooks/useProfile'
 import { useSchedule } from './hooks/useSchedule'
+import { useSelectedDay } from './hooks/useSelectedDay'
 import { isConfigured } from './lib/ai/settings'
 import { DashboardScreen } from './screens/DashboardScreen'
 import { PlaceholderScreen } from './screens/PlaceholderScreen'
@@ -29,22 +30,7 @@ export default function App() {
     void purgeExpired()
   }, [])
 
-  const [day, setDay] = useState(todayKey())
-
-  // Une session laissée ouverte la nuit afficherait hier en le nommant
-  // « aujourd'hui » : au retour au premier plan, la sélection suit le jour réel
-  // si elle portait sur le jour qui vient de passer.
-  useEffect(() => {
-    function follow() {
-      if (document.visibilityState !== 'visible') return
-      setDay((current) =>
-        current < todayKey() && current === shiftDay(todayKey(), -1) ? todayKey() : current,
-      )
-    }
-    document.addEventListener('visibilitychange', follow)
-    return () => document.removeEventListener('visibilitychange', follow)
-  }, [])
-
+  const [day, selectDay] = useSelectedDay()
   const past = isPast(day)
   const editable = !past
 
@@ -127,7 +113,7 @@ export default function App() {
             configured={configured}
             dailyMenu={dailyMenu}
             day={day}
-            onDayChange={setDay}
+            onDayChange={selectDay}
             profile={profile}
             readOnly={past}
           />

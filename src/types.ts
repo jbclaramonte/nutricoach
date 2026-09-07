@@ -49,8 +49,6 @@ export interface MicroNutrient {
 }
 
 export interface DashboardData {
-  /** Date du menu, déjà formatée en français. */
-  dateLabel: string
   micros: MicroNutrient[]
   user: { name: string; avatarUrl: string }
   coach: { name: string }

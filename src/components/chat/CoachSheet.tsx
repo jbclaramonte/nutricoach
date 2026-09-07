@@ -77,6 +77,7 @@ export function CoachSheet({
   const lastRequest = lastRequestIndex >= 0 ? messages[lastRequestIndex].text : ''
   const canApply =
     hasMenu &&
+    !readOnly &&
     !streaming &&
     last?.role === 'assistant' &&
     !last.failed &&
@@ -166,7 +167,7 @@ export function CoachSheet({
             </span>
           </div>
           <div className="flex items-center gap-xs">
-            {messages.length > 0 && (
+            {messages.length > 0 && !readOnly && (
               <button
                 aria-label="Effacer la conversation"
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-on-surface-variant transition-colors active:bg-surface-container-highest"

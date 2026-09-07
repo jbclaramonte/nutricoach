@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { UseActivitiesResult } from '../hooks/useActivities'
 import type { UseDailyMenuResult } from '../hooks/useDailyMenu'
@@ -24,7 +24,14 @@ const meal: Meal = {
 
 const activities: UseActivitiesResult = {
   activities: [
-    { id: 'velo', time: '08:00', typeId: 'bike', title: 'Vélo au travail', durationMin: 30, planned: true },
+    {
+      id: 'velo',
+      time: '08:00',
+      typeId: 'bike',
+      title: 'Vélo au travail',
+      durationMin: 30,
+      planned: true,
+    },
   ],
   add: vi.fn(),
   remove: vi.fn(),
@@ -32,12 +39,12 @@ const activities: UseActivitiesResult = {
 }
 
 /** Menu du jour au repos ; `meals` vide fait apparaître la carte de génération. */
-function menuStore(meals: Meal[]): UseDailyMenuResult {
+function menuStore(meals: Meal[], error = ''): UseDailyMenuResult {
   return {
     menu: null,
     meals,
-    state: 'idle',
-    error: '',
+    state: error ? 'error' : 'idle',
+    error,
     dropped: [],
     generatedAt: null,
     generate: vi.fn(),
@@ -49,18 +56,22 @@ function menuStore(meals: Meal[]): UseDailyMenuResult {
   }
 }
 
-function renderDay(day: string, meals: Meal[] = [meal]) {
-  render(
+function screenOf(day: string, meals: Meal[] = [meal], error = '') {
+  return (
     <DashboardScreen
       activities={activities}
       configured
-      dailyMenu={menuStore(meals)}
+      dailyMenu={menuStore(meals, error)}
       day={day}
       onDayChange={vi.fn()}
       profile={DEFAULT_PROFILE}
       readOnly={day < todayKey()}
-    />,
+    />
   )
+}
+
+function renderDay(day: string, meals: Meal[] = [meal], error = '') {
+  render(screenOf(day, meals, error))
 }
 
 afterEach(cleanup)
@@ -69,15 +80,15 @@ describe('DashboardScreen', () => {
   it('borne le sélecteur à demain', () => {
     renderDay(tomorrow)
 
-    expect(screen.getByLabelText<HTMLButtonElement>('Jour suivant').disabled).toBe(true)
-    expect(screen.getByLabelText<HTMLButtonElement>('Jour précédent').disabled).toBe(false)
+    expect(screen.getByLabelText<HTMLButtonElement>(/Jour suivant/).disabled).toBe(true)
+    expect(screen.getByLabelText<HTMLButtonElement>(/Jour précédent/).disabled).toBe(false)
   })
 
   it('borne le sélecteur à la rétention', () => {
     renderDay(oldestKey())
 
-    expect(screen.getByLabelText<HTMLButtonElement>('Jour précédent').disabled).toBe(true)
-    expect(screen.getByLabelText<HTMLButtonElement>('Jour suivant').disabled).toBe(false)
+    expect(screen.getByLabelText<HTMLButtonElement>(/Jour précédent/).disabled).toBe(true)
+    expect(screen.getByLabelText<HTMLButtonElement>(/Jour suivant/).disabled).toBe(false)
   })
 
   it("annonce la consultation seule sur un jour passé et n'y rend aucune commande", () => {
@@ -99,6 +110,30 @@ describe('DashboardScreen', () => {
     cleanup()
     renderDay(tomorrow)
     expect(screen.queryByLabelText(/Marquer Déjeuner comme/)).toBeNull()
+  })
+
+  it("titre l'écran avec le jour affiché", () => {
+    renderDay(tomorrow)
+
+    expect(screen.getByText(/Votre menu — demain/)).toBeTruthy()
+  })
+
+  it("explique un menu archivé vidé par une erreur, faute de carte d'état", () => {
+    renderDay(yesterday, [], 'Ce menu contient un allergène déclaré depuis.')
+
+    expect(screen.getByText('Ce menu contient un allergène déclaré depuis.')).toBeTruthy()
+  })
+
+  it("referme le formulaire d'ajout au changement de jour", () => {
+    const { rerender } = render(screenOf(todayKey()))
+    fireEvent.click(screen.getByText('Intercaler une activité'))
+    expect(screen.getByLabelText('Annuler')).toBeTruthy()
+
+    rerender(screenOf(tomorrow))
+    rerender(screenOf(todayKey()))
+
+    expect(screen.queryByLabelText('Annuler')).toBeNull()
+    expect(screen.getByText('Intercaler une activité')).toBeTruthy()
   })
 
   it('rend les coches et les commandes le jour même', () => {

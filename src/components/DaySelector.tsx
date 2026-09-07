@@ -19,7 +19,7 @@ export function DaySelector({ day, onChange }: DaySelectorProps) {
   return (
     <div className="flex items-center justify-between rounded-2xl bg-surface-container-lowest px-sm py-xs">
       <button
-        aria-label="Jour précédent"
+        aria-label={`Jour précédent, ${dayLabel(previous).toLowerCase()}`}
         className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors active:bg-surface-container disabled:opacity-40"
         disabled={previous < oldest}
         onClick={() => onChange(previous)}
@@ -28,10 +28,10 @@ export function DaySelector({ day, onChange }: DaySelectorProps) {
         <Icon name="chevron_left" />
       </button>
 
-      <span className="font-headline-md text-body-md text-on-surface">{dayLabel(day)}</span>
+      <span aria-live="polite" className="font-headline-md text-body-md text-on-surface">{dayLabel(day)}</span>
 
       <button
-        aria-label="Jour suivant"
+        aria-label={`Jour suivant, ${dayLabel(next).toLowerCase()}`}
         className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors active:bg-surface-container disabled:opacity-40"
         disabled={next > newest}
         onClick={() => onChange(next)}

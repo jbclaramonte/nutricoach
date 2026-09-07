@@ -10,7 +10,7 @@ import { dashboardData } from '../data/dashboard'
 import type { UseActivitiesResult } from '../hooks/useActivities'
 import type { UseDailyMenuResult } from '../hooks/useDailyMenu'
 import { toMacroRings } from '../lib/ai/menuMap'
-import { isToday } from '../lib/day'
+import { dayLabel, isToday } from '../lib/day'
 import { dailyTarget } from '../lib/energy'
 import { buildTimeline } from '../lib/timeline'
 import type { Profile } from '../lib/profile'
@@ -40,6 +40,15 @@ export function DashboardScreen({
   const { activities, add, remove, confirm } = activityStore
   const { menu, meals, state, error, dropped, generate, toggleEaten } = dailyMenu
   const [adding, setAdding] = useState(false)
+  const [shownDay, setShownDay] = useState(day)
+
+  // Changer de jour referme le formulaire : sa saisie portait sur la journée
+  // qu'on vient de quitter. L'ajustement se fait pendant le rendu, pour que le
+  // formulaire ne réapparaisse pas le temps d'une frame.
+  if (shownDay !== day) {
+    setShownDay(day)
+    setAdding(false)
+  }
 
   // Confirmer une séance ou cocher un repas ne se fait que le jour même :
   // demain, rien n'a encore eu lieu.
@@ -70,11 +79,8 @@ export function DashboardScreen({
 
       <div className="flex flex-col gap-xs">
         <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-background">
-          Votre Menu d'Aujourd'hui
+          Votre menu — {dayLabel(day).toLowerCase()}
         </h1>
-        <p className="font-body-md text-body-md text-on-surface-variant">
-          {dashboardData.dateLabel}
-        </p>
       </div>
 
       <MacroGrid macros={macros} micros={dashboardData.micros} />
@@ -108,7 +114,7 @@ export function DashboardScreen({
           />
         )}
 
-        {meals.length > 0 && state === 'error' && (
+        {state === 'error' && (meals.length > 0 || readOnly) && (
           <p className="rounded-xl bg-error-container p-sm font-body-md text-body-md text-on-error-container">
             {error}
           </p>
