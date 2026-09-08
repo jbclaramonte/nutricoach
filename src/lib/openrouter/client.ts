@@ -10,6 +10,12 @@ export interface CompletionRequest {
   messages: ORMessage[]
   /** Force une réponse JSON conforme, via `structured_outputs`. */
   jsonSchema?: { name: string; schema: object }
+  /**
+   * Effort de raisonnement demandé au modèle. Les jetons de raisonnement se
+   * prennent sur le même budget que la réponse : sur un menu complet, un modèle
+   * laissé libre s'y épuise et rend un JSON tronqué.
+   */
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high'
   temperature?: number
   maxTokens?: number
   signal?: AbortSignal
@@ -31,6 +37,7 @@ function buildBody(request: CompletionRequest, stream: boolean): string {
     stream,
     temperature: request.temperature,
     max_tokens: request.maxTokens,
+    reasoning: request.reasoningEffort ? { effort: request.reasoningEffort } : undefined,
     response_format: request.jsonSchema
       ? {
           type: 'json_schema',

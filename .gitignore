@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Clé OpenRouter des essais live, jamais versionnée.
+.env.local

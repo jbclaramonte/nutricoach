@@ -6,5 +6,7 @@ export default defineConfig({
   test: {
     // Les hooks se testent avec un rendu React, qui exige un DOM.
     environment: 'jsdom',
+    // Les essais live appellent la vraie API : ils ont leur propre config.
+    exclude: ['node_modules/**', 'live/**'],
   },
 })
