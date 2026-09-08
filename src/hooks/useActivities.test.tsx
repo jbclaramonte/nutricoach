@@ -117,4 +117,56 @@ describe('useActivities', () => {
     })
     expect(set).not.toHaveBeenCalled()
   })
+  it("change l'heure d'une activité enregistrée", async () => {
+    get.mockResolvedValue({
+      activities: [{ id: 'course', time: '18:00', typeId: 'run', title: 'Course', durationMin: 30 }],
+      dismissedPlannedIds: [],
+    })
+    const { result } = renderHook(() => useActivities([], true, todayKey(), true))
+    await waitFor(() => expect(result.current.activities.length).toBe(1))
+
+    act(() => {
+      result.current.setTime('course', '07:15')
+    })
+
+    await waitFor(() => expect(result.current.activities[0].time).toBe('07:15'))
+    expect(set).toHaveBeenCalledWith(`activities:${todayKey()}`, {
+      activities: [{ id: 'course', time: '07:15', typeId: 'run', title: 'Course', durationMin: 30 }],
+      dismissedPlannedIds: [],
+    })
+  })
+
+  it("matérialise une proposition dont on change l'heure", async () => {
+    const day = todayKey()
+    const { result } = renderHook(() => useActivities(scheduleOn(day), true, day, true))
+    await waitFor(() => expect(result.current.activities.length).toBe(1))
+    const proposal = result.current.activities[0]
+    expect(proposal.planned).toBe(true)
+
+    act(() => {
+      result.current.setTime(proposal.id, '09:30')
+    })
+
+    await waitFor(() => expect(result.current.activities[0].time).toBe('09:30'))
+    // Déplacer une proposition, c'est décider de la faire : elle cesse d'être
+    // une esquisse et rejoint le journal du jour.
+    expect(result.current.activities[0].planned).toBe(false)
+    expect(result.current.activities.length).toBe(1)
+  })
+
+  it("n'écrit aucune heure sur un jour archivé", async () => {
+    get.mockResolvedValue({
+      activities: [{ id: 'course', time: '18:00', typeId: 'run', title: 'Course', durationMin: 30 }],
+      dismissedPlannedIds: [],
+    })
+    const { result } = renderHook(() => useActivities([], true, yesterday, false))
+    await waitFor(() => expect(result.current.activities.length).toBe(1))
+
+    act(() => {
+      result.current.setTime('course', '07:15')
+    })
+
+    expect(set).not.toHaveBeenCalled()
+    expect(result.current.activities[0].time).toBe('18:00')
+  })
 })

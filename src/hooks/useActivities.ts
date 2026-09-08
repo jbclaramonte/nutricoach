@@ -21,6 +21,8 @@ export interface UseActivitiesResult {
   remove: (activityId: string) => void
   /** Transforme une proposition du planning en activité réellement faite. */
   confirm: (activityId: string) => void
+  /** Déplace une activité dans la journée, sans toucher à sa durée. */
+  setTime: (activityId: string, time: string) => void
 }
 
 export function useActivities(
@@ -141,6 +143,26 @@ export function useActivities(
       const proposal = planned.find((entry) => entry.id === activityId)
       if (!proposal) return
       persist({ ...current(), activities: [...saved, { ...proposal, planned: false }] })
+    },
+    setTime: (activityId, time) => {
+      // Un jour archivé ou seulement prévu ne s'édite pas : une commande restée
+      // en vol après un changement de jour écrirait dans la mauvaise journée.
+      if (!editable) return
+      const entry = saved.find((activity) => activity.id === activityId)
+      if (entry) {
+        persist({
+          ...current(),
+          activities: saved.map((activity) =>
+            activity.id === activityId ? { ...activity, time } : activity,
+          ),
+        })
+        return
+      }
+      // Déplacer une proposition, c'est décider de la faire : elle n'est pas
+      // dans le journal, l'y écrire à sa nouvelle heure vaut confirmation.
+      const proposal = planned.find((activity) => activity.id === activityId)
+      if (!proposal) return
+      persist({ ...current(), activities: [...saved, { ...proposal, time, planned: false }] })
     },
   }
 }

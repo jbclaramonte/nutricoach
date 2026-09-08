@@ -36,6 +36,7 @@ const activities: UseActivitiesResult = {
   add: vi.fn(),
   remove: vi.fn(),
   confirm: vi.fn(),
+  setTime: vi.fn(),
 }
 
 const addTaste = vi.fn(() => Promise.resolve(true))
@@ -60,6 +61,7 @@ function menuStore(meals: Meal[], error = '', revision: Revision = {}): UseDaily
     generatedAt: null,
     generate: vi.fn(),
     toggleEaten: vi.fn(),
+    setMealTime: vi.fn(),
     revise,
     reviseState: revision.revising ? 'revising' : 'idle',
     reviseError: revision.reviseError ?? '',
@@ -453,5 +455,38 @@ describe('DashboardScreen', () => {
     cleanup()
     renderDay(todayKey(), [meal], '', { reviseError: 'Le modèle n\'a pas répondu.' })
     expect(screen.getByText("Le modèle n'a pas répondu.")).toBeTruthy()
+  })
+  it("déplace un repas et une activité le jour même", () => {
+    const store = menuStore([meal])
+    const activityStore: UseActivitiesResult = { ...activities, setTime: vi.fn() }
+    render(
+      <DashboardScreen
+        activities={activityStore}
+        addTaste={addTaste}
+        coachOpen={false}
+        profileReadFailed={false}
+        configured
+        dailyMenu={store}
+        day={todayKey()}
+        onDayChange={vi.fn()}
+        profile={DEFAULT_PROFILE}
+        readOnly={false}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Heure de Déjeuner'), { target: { value: '14:00' } })
+    fireEvent.change(screen.getByLabelText('Heure de Vélo au travail'), {
+      target: { value: '07:15' },
+    })
+
+    expect(store.setMealTime).toHaveBeenCalledWith(meal.id, '14:00')
+    expect(activityStore.setTime).toHaveBeenCalledWith('velo', '07:15')
+  })
+
+  it("ne rend aucun champ d'heure sur un jour archivé", () => {
+    renderDay(yesterday)
+
+    expect(screen.queryByLabelText('Heure de Déjeuner')).toBeNull()
+    expect(screen.getByText('12:30')).toBeTruthy()
   })
 })

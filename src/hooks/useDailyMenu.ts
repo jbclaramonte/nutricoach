@@ -47,6 +47,8 @@ export interface UseDailyMenuResult {
   generate: () => void
   /** Bascule l'état « pris » d'un repas, enregistré avec le menu du jour. */
   toggleEaten: (mealId: string) => void
+  /** Déplace un repas dans la journée, sans toucher à son contenu. */
+  setMealTime: (mealId: string, time: string) => void
   /** Réécrit le menu du jour à partir d'une demande en langage naturel. */
   revise: (request: string) => Promise<void>
   reviseState: ReviseState
@@ -297,6 +299,24 @@ export function useDailyMenu(
     [applyStored, day, editable],
   )
 
+  const setMealTime = useCallback(
+    (id: string, time: string) => {
+      // Un jour archivé ou seulement consulté ne se modifie pas.
+      if (!editable) return
+      const current = storedRef.current
+      if (!current) return
+      // L'ordre du tableau ne bouge pas : les repas pris sont désignés par leur
+      // position, et la chronologie affichée se retrie sur l'heure.
+      const meals = current.menu.meals.map((meal, index) =>
+        mealId(index, meal) === id ? { ...meal, time } : meal,
+      )
+      applyStored({ ...current, menu: { ...current.menu, meals } }).catch((writeError) =>
+        console.error('[menu] écriture impossible', writeError),
+      )
+    },
+    [applyStored, editable],
+  )
+
   const revise = useCallback(
     async (request: string) => {
       // Un jour archivé ou seulement consulté ne se modifie pas.
@@ -440,6 +460,7 @@ export function useDailyMenu(
     generatedAt: stored ? new Date(stored.generatedAt) : null,
     generate,
     toggleEaten,
+    setMealTime,
     revise,
     reviseState,
     reviseError,

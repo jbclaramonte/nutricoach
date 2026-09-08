@@ -241,4 +241,32 @@ describe('useDailyMenu', () => {
       'Soupe',
     ])
   })
+  it("change l'heure d'un repas sans en changer le contenu", async () => {
+    get.mockResolvedValue(storedMenu("Aujourd'hui"))
+    const { result } = render(todayKey(), true)
+    await waitFor(() => expect(result.current.menu).not.toBeNull())
+    const id = result.current.meals[0].id
+
+    await act(async () => {
+      result.current.setMealTime(id, '14:00')
+    })
+
+    expect(result.current.menu?.meals[0].time).toBe('14:00')
+    expect(result.current.menu?.meals[0].title).toBe('Poulet et riz')
+    const written = set.mock.calls.at(-1)?.[1] as { menu: { meals: { time: string }[] } }
+    expect(written.menu.meals[0].time).toBe('14:00')
+  })
+
+  it("ne change aucune heure sur un jour archivé", async () => {
+    get.mockResolvedValue(storedMenu('Hier'))
+    const { result } = render(yesterday, false)
+    await waitFor(() => expect(result.current.menu).not.toBeNull())
+
+    await act(async () => {
+      result.current.setMealTime(result.current.meals[0].id, '14:00')
+    })
+
+    expect(result.current.menu?.meals[0].time).toBe('12:30')
+    expect(set).not.toHaveBeenCalled()
+  })
 })

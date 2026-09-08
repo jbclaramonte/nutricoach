@@ -54,8 +54,9 @@ export function DashboardScreen({
   readOnly,
   coachOpen,
 }: DashboardScreenProps) {
-  const { activities, add, remove, confirm } = activityStore
-  const { menu, meals, state, error, dropped, generate, toggleEaten, revise } = dailyMenu
+  const { activities, add, remove, confirm, setTime } = activityStore
+  const { menu, meals, state, error, dropped, generate, toggleEaten, setMealTime, revise } =
+    dailyMenu
   const [adding, setAdding] = useState(false)
   const [shownDay, setShownDay] = useState(day)
   const [picked, setPicked] = useState<PickedFood | null>(null)
@@ -93,6 +94,9 @@ export function DashboardScreen({
   // Préparer la veille est le cas d'usage de ces actions : elles suivent donc
   // la règle de la révision, ouverte à demain, et non celle de la coche.
   const foodActions = !readOnly && !revising
+  // Déplacer un repas ou une séance est une écriture locale : elle ne dépend
+  // pas du modèle, donc pas de la révision en cours, seulement du jour.
+  const editable = !readOnly
 
   function closeSheet() {
     setPicked(null)
@@ -251,6 +255,7 @@ export function DashboardScreen({
               canPickFood={foodActions}
               meal={entry.meal}
               onPickFood={(item) => openSheet(item, entry.meal.slotLabel)}
+              onTimeChange={editable ? setMealTime : undefined}
               onToggleEaten={toggleEaten}
             />
           ) : (
@@ -259,6 +264,7 @@ export function DashboardScreen({
               key={entry.activity.id}
               onConfirm={confirm}
               onRemove={remove}
+              onTimeChange={editable ? setTime : undefined}
               readOnly={!live}
               weightKg={profile.weightKg}
             />

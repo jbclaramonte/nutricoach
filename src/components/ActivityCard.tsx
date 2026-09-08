@@ -5,6 +5,7 @@ import {
   type Activity,
 } from '../lib/activities'
 import { Icon } from './Icon'
+import { TimeField } from './TimeField'
 
 interface ActivityCardProps {
   activity: Activity
@@ -14,6 +15,8 @@ interface ActivityCardProps {
   onConfirm: (activityId: string) => void
   /** Vrai hors du jour même : une séance non faite ne se confirme pas. */
   readOnly?: boolean
+  /** Absent, l'heure de l'activité se lit sans se déplacer. */
+  onTimeChange?: (activityId: string, time: string) => void
 }
 
 export function ActivityCard({
@@ -22,6 +25,7 @@ export function ActivityCard({
   onRemove,
   onConfirm,
   readOnly = false,
+  onTimeChange,
 }: ActivityCardProps) {
   const type = findActivityType(activity.typeId)
   const calories = estimateCalories(type.met, weightKg, activity.durationMin)
@@ -51,9 +55,12 @@ export function ActivityCard({
           </span>
           <div>
             <div className="flex flex-wrap items-baseline gap-xs">
-              <span className={`whitespace-nowrap text-caption font-bold ${accentText}`}>
-                {activity.time}
-              </span>
+              <TimeField
+                className={`text-caption font-bold ${accentText}`}
+                label={activity.title || type.label}
+                onChange={onTimeChange ? (time) => onTimeChange(activity.id, time) : undefined}
+                time={activity.time}
+              />
               <span className="whitespace-nowrap text-caption text-on-surface-variant">
                 • {type.category}
               </span>

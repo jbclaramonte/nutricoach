@@ -1,6 +1,7 @@
 import type { FoodItem, Meal } from '../types'
 import { formatGrams, sumMeal } from '../lib/nutrition'
 import { Icon } from './Icon'
+import { TimeField } from './TimeField'
 
 interface MealCardProps {
   meal: Meal
@@ -11,6 +12,8 @@ interface MealCardProps {
   canCheckEaten?: boolean
   /** Gouverne les boutons d'aliment : ils suivent la règle de la révision. */
   canPickFood?: boolean
+  /** Absent, l'heure du repas se lit sans se déplacer. */
+  onTimeChange?: (mealId: string, time: string) => void
 }
 
 export function MealCard({
@@ -19,6 +22,7 @@ export function MealCard({
   onPickFood,
   canCheckEaten = true,
   canPickFood = true,
+  onTimeChange,
 }: MealCardProps) {
   const totals = sumMeal(meal.items)
 
@@ -43,9 +47,12 @@ export function MealCard({
         <div className="mb-sm flex items-start justify-between">
           <div>
             <div className="flex flex-wrap items-baseline gap-xs">
-              <span className="whitespace-nowrap text-caption font-bold text-primary">
-                {meal.time}
-              </span>
+              <TimeField
+                className="text-caption font-bold text-primary"
+                label={meal.slotLabel}
+                onChange={onTimeChange ? (time) => onTimeChange(meal.id, time) : undefined}
+                time={meal.time}
+              />
               <span className="whitespace-nowrap text-caption text-on-surface-variant">
                 • {meal.slotLabel}
               </span>
