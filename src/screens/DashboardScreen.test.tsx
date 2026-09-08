@@ -227,7 +227,7 @@ describe('DashboardScreen', () => {
   it("demande le remplacement d'un aliment manquant", () => {
     renderDay(todayKey())
     openSheet()
-    fireEvent.click(screen.getByText("Je n'en ai pas"))
+    fireEvent.click(screen.getByText('Changer cet ingrédient'))
 
     expect(revise).toHaveBeenCalledWith(
       "Je n'ai pas de Saumon pour le Déjeuner. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.",
@@ -259,7 +259,7 @@ describe('DashboardScreen', () => {
   it("offre les actions d'aliment sur demain, sans la coche", () => {
     renderDay(tomorrow)
     fireEvent.click(screen.getByLabelText('Actions pour Saumon'))
-    fireEvent.click(screen.getByText("Je n'en ai pas"))
+    fireEvent.click(screen.getByText('Changer cet ingrédient'))
 
     expect(revise).toHaveBeenCalledWith(
       "Je n'ai pas de Saumon pour le Déjeuner. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.",
@@ -271,7 +271,7 @@ describe('DashboardScreen', () => {
     const spaced: Meal = { ...meal, items: [{ ...meal.items[0], name: '  Saumon  ' }] }
     renderDay(todayKey(), [spaced])
     fireEvent.click(screen.getByLabelText(/Actions pour/))
-    fireEvent.click(screen.getByText("Je n'en ai pas"))
+    fireEvent.click(screen.getByText('Changer cet ingrédient'))
 
     expect(revise).toHaveBeenCalledWith(
       "Je n'ai pas de Saumon pour le Déjeuner. Remplace-le ; si le plat ne tient plus sans lui, repropose ce repas. Garde les autres repas à l'identique.",

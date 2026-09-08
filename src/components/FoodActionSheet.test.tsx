@@ -44,7 +44,7 @@ describe('FoodActionSheet', () => {
 
     fireEvent.click(screen.getByText("J'aime"))
     fireEvent.click(screen.getByText("Je n'aime pas"))
-    fireEvent.click(screen.getByText("Je n'en ai pas"))
+    fireEvent.click(screen.getByText('Changer cet ingrédient'))
 
     expect(props.onLike).toHaveBeenCalledOnce()
     expect(props.onDislike).toHaveBeenCalledOnce()

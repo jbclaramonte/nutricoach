@@ -22,6 +22,43 @@ function sameItems(left: GeneratedMeal, right: GeneratedMeal): boolean {
   return JSON.stringify(left.items) === JSON.stringify(right.items)
 }
 
+export interface MergeResult {
+  menu: GeneratedMenu
+  /** Créneaux du menu courant que la révision avait omis, donc conservés. */
+  kept: string[]
+}
+
+/**
+ * Fusionne une révision dans le menu courant. Un modèle à qui l'on demande de
+ * changer un ingrédient renvoie souvent le seul repas concerné, malgré la
+ * consigne : prendre sa réponse telle quelle effacerait le reste de la journée.
+ * Un repas absent de la révision est donc conservé, jamais supprimé.
+ */
+export function mergeRevision(current: GeneratedMenu, revised: GeneratedMenu): MergeResult {
+  const claimed = new Set<number>()
+  const kept: string[] = []
+
+  const meals = current.meals.map((meal) => {
+    const match = revised.meals.findIndex(
+      (candidate, position) => candidate.slot === meal.slot && !claimed.has(position),
+    )
+    if (match === -1) {
+      kept.push(meal.slotLabel)
+      return meal
+    }
+    claimed.add(match)
+    return revised.meals[match]
+  })
+
+  // Un repas que la révision ajoute — une collation demandée, par exemple — n'a
+  // pas d'équivalent courant : il vient à la suite.
+  revised.meals.forEach((meal, position) => {
+    if (!claimed.has(position)) meals.push(meal)
+  })
+
+  return { menu: { ...revised, meals }, kept }
+}
+
 export interface RestoreResult {
   menu: GeneratedMenu
   /** Repas gelés que le modèle avait modifiés, remis dans leur état d'origine. */

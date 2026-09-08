@@ -200,4 +200,45 @@ describe('useDailyMenu', () => {
     expect(result.current.reviseState).toBe('idle')
     expect(set).not.toHaveBeenCalled()
   })
+  it('garde les repas absents de la révision', async () => {
+    const stored = storedMenu('Journée complète')
+    stored.menu.meals.push({
+      slot: 'dinner',
+      slotLabel: 'Dîner',
+      time: '19:30',
+      title: 'Soupe',
+      items: [{ name: 'Potiron', quantity: '300g', calories: 150, protein: 3, fiber: 5 }],
+      rationale: '',
+    })
+    get.mockResolvedValue(stored)
+    // Le modèle ne renvoie que le repas touché, malgré la consigne : le dîner
+    // ne doit pas disparaître de la journée pour autant.
+    ask.mockResolvedValue(
+      JSON.stringify({
+        date: 'Journée complète',
+        banner: 'Journée complète',
+        meals: [
+          {
+            slot: 'lunch',
+            slotLabel: 'Déjeuner',
+            time: '12:30',
+            title: 'Poulet et quinoa',
+            items: [{ name: 'Quinoa', quantity: '150g', calories: 200, protein: 6, fiber: 3 }],
+            rationale: '',
+          },
+        ],
+      }),
+    )
+    const { result } = render(todayKey(), true)
+    await waitFor(() => expect(result.current.menu).not.toBeNull())
+
+    await act(async () => {
+      await result.current.revise("je n'ai pas de riz")
+    })
+
+    expect(result.current.menu?.meals.map((meal) => meal.title)).toEqual([
+      'Poulet et quinoa',
+      'Soupe',
+    ])
+  })
 })

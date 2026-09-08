@@ -95,7 +95,7 @@ export function FoodActionSheet({
     },
     {
       icon: 'remove_shopping_cart',
-      label: "Je n'en ai pas",
+      label: 'Changer cet ingrédient',
       consequence: 'remplacé dans ce repas',
       onClick: onMissing,
     },

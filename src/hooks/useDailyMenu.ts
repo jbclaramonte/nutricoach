@@ -9,6 +9,7 @@ import { buildCoachSystemPrompt, buildMenuRequest, buildRevisionRequest } from '
 import {
   consumedCalories,
   mealId,
+  mergeRevision,
   restoreFrozenMeals,
   summariseChanges,
 } from '../lib/ai/menuRevise'
@@ -380,7 +381,10 @@ export function useDailyMenu(
         }
 
         if (stale()) return
-        const { menu: guarded, restored } = restoreFrozenMeals(current.menu, parsed.menu, eatenIds)
+        // La révision est fusionnée avant tout contrôle : un repas que le
+        // modèle a omis reste celui du menu courant, il ne disparaît pas.
+        const { menu: full } = mergeRevision(current.menu, parsed.menu)
+        const { menu: guarded, restored } = restoreFrozenMeals(current.menu, full, eatenIds)
 
         const next: StoredMenu = {
           ...current,
